@@ -351,8 +351,12 @@ const FarmerWeatherScreen = ({ onNavigateBack }) => {
                     {weatherData && (
                         <View style={[dynamicStyles.weatherCard, { backgroundColor: colors.card }]}>
                             <View style={dynamicStyles.weatherHeader}>
-                                <View>
-                                    <Text style={[dynamicStyles.locationText, { color: colors.textSecondary }]}>
+                                <View style={dynamicStyles.weatherHeaderLeft}>
+                                    <Text 
+                                        style={[dynamicStyles.locationText, { color: colors.textSecondary }]}
+                                        numberOfLines={2}
+                                        ellipsizeMode="tail"
+                                    >
                                         📍 {locationName}
                                     </Text>
                                     <Text style={[dynamicStyles.temperature, { color: colors.text }]}>
@@ -594,9 +598,14 @@ const getStyles = (colors, isDark) => StyleSheet.create({
         alignItems: 'flex-start',
         marginBottom: 20,
     },
+    weatherHeaderLeft: {
+        flex: 1,
+        marginRight: 12,
+    },
     locationText: {
         fontSize: 14,
         marginBottom: 8,
+        flexWrap: 'wrap',
     },
     temperature: {
         fontSize: 48,

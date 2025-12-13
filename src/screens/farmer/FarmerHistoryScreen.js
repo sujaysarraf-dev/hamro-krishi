@@ -29,11 +29,12 @@ const FarmerHistoryScreen = () => {
                 return;
             }
 
-            // Get orders that contain products from this farmer
+            // Optimized: Get only product IDs (minimal data)
             const { data: productsData } = await supabase
                 .from('products')
                 .select('id')
-                .eq('farmer_id', user.id);
+                .eq('farmer_id', user.id)
+                .limit(1000); // Add limit for safety
 
             if (!productsData || productsData.length === 0) {
                 setOrders([]);
@@ -43,10 +44,17 @@ const FarmerHistoryScreen = () => {
 
             const productIds = productsData.map(p => p.id);
 
+            // Optimized query - select only needed fields
             const { data, error } = await supabase
                 .from('order_items')
                 .select(`
-                    *,
+                    id,
+                    order_id,
+                    product_id,
+                    quantity,
+                    unit_price,
+                    total_price,
+                    created_at,
                     orders (
                         id,
                         user_id,
@@ -66,7 +74,8 @@ const FarmerHistoryScreen = () => {
                     )
                 `)
                 .in('product_id', productIds)
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .limit(100); // Add pagination limit
 
             if (error) {
                 console.error('Error loading orders:', error);

@@ -50,10 +50,36 @@ const UserShopScreen = () => {
         try {
             setLoading(true);
             
-            // Build query
+            // Check cache first
+            const cacheKey = `shop_products_${selectedCategory}_${organicFilter}`;
+            const cachedData = await cache.get(cacheKey);
+            if (cachedData) {
+                setProducts(cachedData);
+                setLoading(false);
+                return;
+            }
+            
+            // Optimized query with join - fetch products and profiles in one query
             let query = supabase
                 .from('products')
-                .select('*')
+                .select(`
+                    id,
+                    name,
+                    description,
+                    price,
+                    stock_quantity,
+                    stock_unit,
+                    category,
+                    image_url,
+                    is_organic,
+                    created_at,
+                    farmer_id,
+                    user_profiles:farmer_id (
+                        id,
+                        full_name,
+                        phone
+                    )
+                `)
                 .eq('category', selectedCategory)
                 .eq('status', 'Active');
             
@@ -71,28 +97,11 @@ const UserShopScreen = () => {
                 throw productsError;
             }
 
-            // Fetch farmer profiles for the products
-            if (productsData && productsData.length > 0) {
-                const farmerIds = [...new Set(productsData.map(p => p.farmer_id))];
-                const { data: profilesData, error: profilesError } = await supabase
-                    .from('user_profiles')
-                    .select('id, full_name, phone')
-                    .in('id', farmerIds);
-
-                if (profilesError) {
-                    console.error('Error loading profiles:', profilesError);
-                }
-
-                // Combine products with profiles
-                const productsWithProfiles = productsData.map(product => ({
-                    ...product,
-                    user_profiles: profilesData?.find(p => p.id === product.farmer_id) || null
-                }));
-
-                setProducts(productsWithProfiles);
-            } else {
-                setProducts([]);
-            }
+            const finalData = productsData || [];
+            setProducts(finalData);
+            
+            // Cache the results
+            await cache.set(cacheKey, finalData);
 
         } catch (error) {
             console.error('Error loading products:', error);
@@ -105,10 +114,27 @@ const UserShopScreen = () => {
         try {
             setSearchLoading(true);
             
-            // Build search query - search in product name and description
+            // Optimized search query with join
             let query = supabase
                 .from('products')
-                .select('*')
+                .select(`
+                    id,
+                    name,
+                    description,
+                    price,
+                    stock_quantity,
+                    stock_unit,
+                    category,
+                    image_url,
+                    is_organic,
+                    created_at,
+                    farmer_id,
+                    user_profiles:farmer_id (
+                        id,
+                        full_name,
+                        phone
+                    )
+                `)
                 .eq('status', 'Active')
                 .ilike('name', `%${searchQuery}%`);
             
@@ -126,28 +152,7 @@ const UserShopScreen = () => {
                 throw productsError;
             }
 
-            // Fetch farmer profiles for the products
-            if (productsData && productsData.length > 0) {
-                const farmerIds = [...new Set(productsData.map(p => p.farmer_id))];
-                const { data: profilesData, error: profilesError } = await supabase
-                    .from('user_profiles')
-                    .select('id, full_name, phone')
-                    .in('id', farmerIds);
-
-                if (profilesError) {
-                    console.error('Error loading profiles:', profilesError);
-                }
-
-                // Combine products with profiles
-                const productsWithProfiles = productsData.map(product => ({
-                    ...product,
-                    user_profiles: profilesData?.find(p => p.id === product.farmer_id) || null
-                }));
-
-                setSearchResults(productsWithProfiles);
-            } else {
-                setSearchResults([]);
-            }
+            setSearchResults(productsData || []);
 
         } catch (error) {
             console.error('Error searching products:', error);

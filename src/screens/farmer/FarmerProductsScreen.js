@@ -65,9 +65,26 @@ const FarmerProductsScreen = () => {
                 return;
             }
 
+            // Optimized query - select only needed fields
             const { data, error } = await supabase
                 .from('products')
-                .select('*')
+                .select(`
+                    id,
+                    name,
+                    description,
+                    price,
+                    stock_quantity,
+                    stock_unit,
+                    category,
+                    image_url,
+                    status,
+                    is_organic,
+                    organic_certification_number,
+                    organic_certification_authority,
+                    organic_certification_date,
+                    created_at,
+                    updated_at
+                `)
                 .eq('farmer_id', user.id)
                 .order('created_at', { ascending: false });
 

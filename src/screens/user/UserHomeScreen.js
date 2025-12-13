@@ -5,6 +5,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../config/supabase';
 import { useFocusEffect } from 'expo-router';
 import ProductDetailModal from '../../components/ProductDetailModal';
+import { cache } from '../../utils/cache';
 
 const { width } = Dimensions.get('window');
 
@@ -49,10 +50,36 @@ const UserHomeScreen = () => {
         try {
             setLoading(true);
             
-            // Fetch products with farmer profile information
+            // Check cache first
+            const cacheKey = `products_${selectedCategory}`;
+            const cachedData = await cache.get(cacheKey);
+            if (cachedData) {
+                setProducts(cachedData);
+                setLoading(false);
+                return;
+            }
+            
+            // Optimized query with join - fetch products and profiles in one query
             const { data: productsData, error: productsError } = await supabase
                 .from('products')
-                .select('*')
+                .select(`
+                    id,
+                    name,
+                    description,
+                    price,
+                    stock_quantity,
+                    stock_unit,
+                    category,
+                    image_url,
+                    is_organic,
+                    created_at,
+                    farmer_id,
+                    user_profiles:farmer_id (
+                        id,
+                        full_name,
+                        phone
+                    )
+                `)
                 .eq('category', selectedCategory)
                 .eq('status', 'Active')
                 .order('created_at', { ascending: false })
@@ -63,28 +90,11 @@ const UserHomeScreen = () => {
                 throw productsError;
             }
 
-            // Fetch farmer profiles for the products
-            if (productsData && productsData.length > 0) {
-                const farmerIds = [...new Set(productsData.map(p => p.farmer_id))];
-                const { data: profilesData, error: profilesError } = await supabase
-                    .from('user_profiles')
-                    .select('id, full_name, phone')
-                    .in('id', farmerIds);
-
-                if (profilesError) {
-                    console.error('Error loading profiles:', profilesError);
-                }
-
-                // Combine products with profiles
-                const productsWithProfiles = productsData.map(product => ({
-                    ...product,
-                    user_profiles: profilesData?.find(p => p.id === product.farmer_id) || null
-                }));
-
-                setProducts(productsWithProfiles);
-            } else {
-                setProducts([]);
-            }
+            const finalData = productsData || [];
+            setProducts(finalData);
+            
+            // Cache the results
+            await cache.set(cacheKey, finalData);
 
         } catch (error) {
             console.error('Error loading products:', error);
@@ -104,10 +114,27 @@ const UserHomeScreen = () => {
         try {
             setSearchLoading(true);
             
-            // Build search query - search in product name
+            // Optimized search query with join
             const { data: productsData, error: productsError } = await supabase
                 .from('products')
-                .select('*')
+                .select(`
+                    id,
+                    name,
+                    description,
+                    price,
+                    stock_quantity,
+                    stock_unit,
+                    category,
+                    image_url,
+                    is_organic,
+                    created_at,
+                    farmer_id,
+                    user_profiles:farmer_id (
+                        id,
+                        full_name,
+                        phone
+                    )
+                `)
                 .eq('status', 'Active')
                 .ilike('name', `%${searchQuery}%`)
                 .order('created_at', { ascending: false })
@@ -118,28 +145,7 @@ const UserHomeScreen = () => {
                 throw productsError;
             }
 
-            // Fetch farmer profiles for the products
-            if (productsData && productsData.length > 0) {
-                const farmerIds = [...new Set(productsData.map(p => p.farmer_id))];
-                const { data: profilesData, error: profilesError } = await supabase
-                    .from('user_profiles')
-                    .select('id, full_name, phone')
-                    .in('id', farmerIds);
-
-                if (profilesError) {
-                    console.error('Error loading profiles:', profilesError);
-                }
-
-                // Combine products with profiles
-                const productsWithProfiles = productsData.map(product => ({
-                    ...product,
-                    user_profiles: profilesData?.find(p => p.id === product.farmer_id) || null
-                }));
-
-                setSearchResults(productsWithProfiles);
-            } else {
-                setSearchResults([]);
-            }
+            setSearchResults(productsData || []);
 
         } catch (error) {
             console.error('Error searching products:', error);
@@ -180,10 +186,27 @@ const UserHomeScreen = () => {
         try {
             setLoadingFeatured(true);
             
-            // Fetch 3 random products from database
+            // Optimized query with join for featured products
             const { data: productsData, error: productsError } = await supabase
                 .from('products')
-                .select('*')
+                .select(`
+                    id,
+                    name,
+                    description,
+                    price,
+                    stock_quantity,
+                    stock_unit,
+                    category,
+                    image_url,
+                    is_organic,
+                    created_at,
+                    farmer_id,
+                    user_profiles:farmer_id (
+                        id,
+                        full_name,
+                        phone
+                    )
+                `)
                 .eq('status', 'Active')
                 .order('created_at', { ascending: false })
                 .limit(3);
@@ -193,28 +216,7 @@ const UserHomeScreen = () => {
                 throw productsError;
             }
 
-            // Fetch farmer profiles for the products
-            if (productsData && productsData.length > 0) {
-                const farmerIds = [...new Set(productsData.map(p => p.farmer_id))];
-                const { data: profilesData, error: profilesError } = await supabase
-                    .from('user_profiles')
-                    .select('id, full_name, phone')
-                    .in('id', farmerIds);
-
-                if (profilesError) {
-                    console.error('Error loading profiles:', profilesError);
-                }
-
-                // Combine products with profiles
-                const productsWithProfiles = productsData.map(product => ({
-                    ...product,
-                    user_profiles: profilesData?.find(p => p.id === product.farmer_id) || null
-                }));
-
-                setFeaturedProducts(productsWithProfiles);
-            } else {
-                setFeaturedProducts([]);
-            }
+            setFeaturedProducts(productsData || []);
 
         } catch (error) {
             console.error('Error loading featured products:', error);
