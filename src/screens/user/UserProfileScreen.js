@@ -292,21 +292,9 @@ const UserProfileScreen = () => {
                         </TouchableOpacity>
                     </View>
 
-                    {/* Business Options */}
+                    {/* Settings */}
                     <View style={dynamicStyles.section}>
-                        <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>Business</Text>
-                        <TouchableOpacity 
-                            style={[dynamicStyles.menuItem, { borderBottomColor: colors.border, backgroundColor: colors.surface }]}
-                            onPress={() => {
-                                console.log('Sell Raw Materials pressed');
-                                router.push('/sell-raw-materials');
-                            }}
-                        >
-                            <Text style={dynamicStyles.menuIcon}>🏭</Text>
-                            <Text style={[dynamicStyles.menuText, { color: colors.text, fontWeight: '700' }]}>Sell Raw Materials</Text>
-                            <Text style={[dynamicStyles.menuArrow, { color: colors.textSecondary }]}>›</Text>
-                        </TouchableOpacity>
-
+                        <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>Settings</Text>
                         <TouchableOpacity 
                             style={[dynamicStyles.menuItem, { borderBottomColor: colors.border }]}
                             onPress={() => {

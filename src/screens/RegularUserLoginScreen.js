@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -13,6 +13,22 @@ const RegularUserLoginScreen = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [alert, setAlert] = useState({ visible: false, type: 'info', title: '', message: '' });
+
+    useEffect(() => {
+        // Check if user is already logged in
+        const checkAuth = async () => {
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session && session.user) {
+                    // User is already logged in, redirect to dashboard
+                    router.replace('/user-dashboard');
+                }
+            } catch (error) {
+                console.error('Auth check error:', error);
+            }
+        };
+        checkAuth();
+    }, []);
 
     // Helper function to check if input is email or phone
     const isEmail = (input) => {

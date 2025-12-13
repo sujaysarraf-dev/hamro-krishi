@@ -7,6 +7,8 @@ import FarmerProductsScreen from './FarmerProductsScreen';
 import FarmerDiscussionScreen from './FarmerDiscussionScreen';
 import FarmerHistoryScreen from './FarmerHistoryScreen';
 import FarmerProfileScreen from './FarmerProfileScreen';
+import FarmerWeatherScreen from './FarmerWeatherScreen';
+import FarmerCropCalendarScreen from './FarmerCropCalendarScreen';
 
 const FarmerDashboardScreen = () => {
     const { colors, isDark } = useTheme();
@@ -15,17 +17,27 @@ const FarmerDashboardScreen = () => {
     const renderScreen = () => {
         switch (activeTab) {
             case 'home':
-                return <FarmerHomeScreen />;
+                return <FarmerHomeScreen 
+                    onNavigateToWeather={() => setActiveTab('weather')}
+                    onNavigateToCalendar={() => setActiveTab('calendar')}
+                />;
             case 'products':
                 return <FarmerProductsScreen />;
             case 'discussion':
                 return <FarmerDiscussionScreen />;
+            case 'weather':
+                return <FarmerWeatherScreen />;
+            case 'calendar':
+                return <FarmerCropCalendarScreen />;
             case 'orders':
                 return <FarmerHistoryScreen />;
             case 'profile':
                 return <FarmerProfileScreen />;
             default:
-                return <FarmerHomeScreen />;
+                return <FarmerHomeScreen 
+                    onNavigateToWeather={() => setActiveTab('weather')}
+                    onNavigateToCalendar={() => setActiveTab('calendar')}
+                />;
         }
     };
 

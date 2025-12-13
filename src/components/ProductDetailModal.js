@@ -79,7 +79,19 @@ const ProductDetailModal = ({ visible, product, onClose }) => {
 
                             {/* Product Info */}
                             <View style={dynamicStyles.productInfo}>
-                                <Text style={[dynamicStyles.productName, { color: colors.text }]}>{product.name}</Text>
+                                <View style={dynamicStyles.productNameRow}>
+                                    <Text style={[dynamicStyles.productName, { color: colors.text }]}>{product.name}</Text>
+                                    {product.is_organic && (
+                                        <View style={[dynamicStyles.organicBadge, { backgroundColor: '#4CAF50' + '20' }]}>
+                                            <Text style={[dynamicStyles.organicBadgeText, { color: '#4CAF50' }]}>🌿 Organic</Text>
+                                        </View>
+                                    )}
+                                </View>
+                                {product.is_organic && product.organic_certification_authority && (
+                                    <Text style={[dynamicStyles.organicCert, { color: colors.textSecondary }]}>
+                                        Certified by: {product.organic_certification_authority}
+                                    </Text>
+                                )}
                                 <Text style={[dynamicStyles.productPrice, { color: colors.primary }]}>
                                     NPR {formatPrice(product.price)} / {product.stock_unit || 'kilograms'}
                                 </Text>
@@ -201,11 +213,31 @@ const getStyles = (colors, isDark) => StyleSheet.create({
     productInfo: {
         padding: 20,
     },
+    productNameRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        marginBottom: 8,
+    },
     productName: {
         fontSize: 24,
         fontWeight: '700',
         color: colors.text,
+        marginRight: 8,
+    },
+    organicBadge: {
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    organicBadgeText: {
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    organicCert: {
+        fontSize: 13,
         marginBottom: 8,
+        fontStyle: 'italic',
     },
     productPrice: {
         fontSize: 20,

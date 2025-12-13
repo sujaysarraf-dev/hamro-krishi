@@ -9,7 +9,7 @@ import * as Location from 'expo-location';
 const { width } = Dimensions.get('window');
 const WEATHERBIT_API_KEY = 'b6d691f2b36741c0b7d036f5c88b7d30';
 
-const FarmerHomeScreen = () => {
+const FarmerHomeScreen = ({ onNavigateToWeather, onNavigateToCalendar }) => {
     const { colors, isDark } = useTheme();
     const dynamicStyles = getStyles(colors, isDark);
     const [searchQuery, setSearchQuery] = useState('');
@@ -312,9 +312,9 @@ const FarmerHomeScreen = () => {
                         <Text style={dynamicStyles.refreshIcon}>🔄</Text>
                     </TouchableOpacity>
                 </View>
-                </View>
+            </View>
 
-                <ScrollView showsVerticalScrollIndicator={false} style={dynamicStyles.scrollView}>
+            <ScrollView showsVerticalScrollIndicator={false} style={dynamicStyles.scrollView}>
                     <View style={dynamicStyles.content}>
                         {/* Search Bar */}
                     <View style={[dynamicStyles.searchContainer, { backgroundColor: isDark ? colors.surface : '#E8F5E9' }]}>
@@ -436,6 +436,31 @@ const FarmerHomeScreen = () => {
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
+                    </View>
+
+                    {/* Quick Access Section */}
+                    <View style={dynamicStyles.section}>
+                        <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>Quick Access</Text>
+                        <View style={dynamicStyles.quickAccessGrid}>
+                            <TouchableOpacity 
+                                style={[dynamicStyles.quickAccessCard, { backgroundColor: colors.card }]}
+                                onPress={() => {
+                                    if (onNavigateToWeather) onNavigateToWeather();
+                                }}
+                            >
+                                <Text style={dynamicStyles.quickAccessIcon}>🌤️</Text>
+                                <Text style={[dynamicStyles.quickAccessText, { color: colors.text }]}>Weather & Advisory</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                                style={[dynamicStyles.quickAccessCard, { backgroundColor: colors.card }]}
+                                onPress={() => {
+                                    if (onNavigateToCalendar) onNavigateToCalendar();
+                                }}
+                            >
+                                <Text style={dynamicStyles.quickAccessIcon}>📅</Text>
+                                <Text style={[dynamicStyles.quickAccessText, { color: colors.text }]}>Crop Calendar</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
             </ScrollView>
@@ -889,6 +914,27 @@ const getStyles = (colors, isDark) => StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
         color: colors.text,
+    },
+    quickAccessGrid: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    quickAccessCard: {
+        flex: 1,
+        borderRadius: 12,
+        padding: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: 100,
+    },
+    quickAccessIcon: {
+        fontSize: 32,
+        marginBottom: 8,
+    },
+    quickAccessText: {
+        fontSize: 14,
+        fontWeight: '600',
+        textAlign: 'center',
     },
     modalOverlay: {
         flex: 1,

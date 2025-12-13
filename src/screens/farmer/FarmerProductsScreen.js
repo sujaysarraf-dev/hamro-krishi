@@ -36,6 +36,10 @@ const FarmerProductsScreen = () => {
         status: 'Active',
         category: 'grain',
         imageUrl: null,
+        isOrganic: false,
+        organicCertificationNumber: '',
+        organicCertificationAuthority: '',
+        organicCertificationDate: '',
     });
     const [localImage, setLocalImage] = useState(null);
 
@@ -98,6 +102,10 @@ const FarmerProductsScreen = () => {
             status: 'Active',
             category: 'grain',
             imageUrl: null,
+            isOrganic: false,
+            organicCertificationNumber: '',
+            organicCertificationAuthority: '',
+            organicCertificationDate: '',
         });
         setLocalImage(null);
         setShowAddModal(true);
@@ -115,6 +123,10 @@ const FarmerProductsScreen = () => {
             status: product.status || 'Active',
             category: product.category || 'grain',
             imageUrl: product.image_url || null,
+            isOrganic: product.is_organic || false,
+            organicCertificationNumber: product.organic_certification_number || '',
+            organicCertificationAuthority: product.organic_certification_authority || '',
+            organicCertificationDate: product.organic_certification_date || '',
         });
         setLocalImage(product.image_url || null);
         setShowAddModal(true);
@@ -276,6 +288,10 @@ const FarmerProductsScreen = () => {
                 stock_unit: formData.stockUnit,
                 status: formData.status,
                 category: formData.category,
+                is_organic: formData.isOrganic,
+                organic_certification_number: formData.isOrganic ? formData.organicCertificationNumber.trim() || null : null,
+                organic_certification_authority: formData.isOrganic ? formData.organicCertificationAuthority.trim() || null : null,
+                organic_certification_date: formData.isOrganic && formData.organicCertificationDate ? formData.organicCertificationDate : null,
             };
 
             if (editingProduct) {
@@ -736,6 +752,46 @@ const FarmerProductsScreen = () => {
                                     </View>
                                 </View>
 
+                                {/* Organic Certification */}
+                                <View style={dynamicStyles.formGroup}>
+                                    <View style={dynamicStyles.organicHeader}>
+                                        <Text style={[dynamicStyles.label, { color: colors.text }]}>Organic Certification</Text>
+                                        <TouchableOpacity
+                                            style={[dynamicStyles.switchContainer, { backgroundColor: formData.isOrganic ? colors.primary : colors.surface }]}
+                                            onPress={() => setFormData({ ...formData, isOrganic: !formData.isOrganic })}
+                                        >
+                                            <Text style={[dynamicStyles.switchText, { color: formData.isOrganic ? '#FFFFFF' : colors.text }]}>
+                                                {formData.isOrganic ? 'Yes' : 'No'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    {formData.isOrganic && (
+                                        <>
+                                            <TextInput
+                                                style={[dynamicStyles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text, marginTop: 8 }]}
+                                                value={formData.organicCertificationNumber}
+                                                onChangeText={(text) => setFormData({ ...formData, organicCertificationNumber: text })}
+                                                placeholder="Certification Number"
+                                                placeholderTextColor={colors.textSecondary}
+                                            />
+                                            <TextInput
+                                                style={[dynamicStyles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text, marginTop: 8 }]}
+                                                value={formData.organicCertificationAuthority}
+                                                onChangeText={(text) => setFormData({ ...formData, organicCertificationAuthority: text })}
+                                                placeholder="Certifying Authority (e.g., USDA, EU Organic)"
+                                                placeholderTextColor={colors.textSecondary}
+                                            />
+                                            <TextInput
+                                                style={[dynamicStyles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text, marginTop: 8 }]}
+                                                value={formData.organicCertificationDate}
+                                                onChangeText={(text) => setFormData({ ...formData, organicCertificationDate: text })}
+                                                placeholder="Certification Date (YYYY-MM-DD)"
+                                                placeholderTextColor={colors.textSecondary}
+                                            />
+                                        </>
+                                    )}
+                                </View>
+
                                 {/* Save Button */}
                                 <TouchableOpacity
                                     style={[dynamicStyles.saveButton, { backgroundColor: colors.primary }, saving && dynamicStyles.saveButtonDisabled]}
@@ -932,10 +988,25 @@ const getStyles = (colors, isDark) => StyleSheet.create({
     productDetails: {
         flex: 1,
     },
+    productNameRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        marginBottom: 4,
+    },
     productName: {
         fontSize: 16,
         fontWeight: '700',
-        marginBottom: 4,
+        marginRight: 8,
+    },
+    organicBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 8,
+    },
+    organicBadgeText: {
+        fontSize: 11,
+        fontWeight: '600',
     },
     productPrice: {
         fontSize: 16,

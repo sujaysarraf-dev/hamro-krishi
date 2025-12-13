@@ -16,6 +16,7 @@ const UserShopScreen = () => {
     const [loading, setLoading] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [modalVisible, setModalVisible] = useState(false);
+    const [organicFilter, setOrganicFilter] = useState(false);
 
     const productCategories = ['grain', 'vegetable', 'fruit', 'livestock', 'cash crop', 'spice and herb', 'fish'];
 
@@ -25,7 +26,7 @@ const UserShopScreen = () => {
         } else {
             setProducts([]);
         }
-    }, [selectedCategory]);
+    }, [selectedCategory, organicFilter]);
 
     useFocusEffect(
         React.useCallback(() => {
@@ -39,12 +40,19 @@ const UserShopScreen = () => {
         try {
             setLoading(true);
             
-            // Fetch products with farmer profile information
-            const { data: productsData, error: productsError } = await supabase
+            // Build query
+            let query = supabase
                 .from('products')
                 .select('*')
                 .eq('category', selectedCategory)
-                .eq('status', 'Active')
+                .eq('status', 'Active');
+            
+            // Add organic filter if enabled
+            if (organicFilter) {
+                query = query.eq('is_organic', true);
+            }
+            
+            const { data: productsData, error: productsError } = await query
                 .order('created_at', { ascending: false })
                 .limit(20);
 
@@ -91,8 +99,13 @@ const UserShopScreen = () => {
     };
 
     const filteredProducts = products.filter(product => {
-        if (!searchQuery) return true;
-        return product.name.toLowerCase().includes(searchQuery.toLowerCase());
+        if (searchQuery && !product.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+            return false;
+        }
+        if (organicFilter && !product.is_organic) {
+            return false;
+        }
+        return true;
     });
 
     const handleProductPress = (product) => {
@@ -127,6 +140,34 @@ const UserShopScreen = () => {
                                 <Text style={dynamicStyles.filterIcon}>⚙️</Text>
                             </TouchableOpacity>
                         </View>
+                    </View>
+
+                    {/* Organic Filter */}
+                    <View style={[dynamicStyles.organicFilterContainer, { backgroundColor: colors.surface }]}>
+                        <Text style={[dynamicStyles.organicFilterLabel, { color: colors.text }]}>🌿 Organic Only</Text>
+                        <TouchableOpacity
+                            style={[
+                                dynamicStyles.organicToggle,
+                                { 
+                                    backgroundColor: organicFilter ? colors.primary : colors.background,
+                                    borderColor: colors.border,
+                                }
+                            ]}
+                            onPress={() => {
+                                setOrganicFilter(!organicFilter);
+                                if (selectedCategory !== 'all') {
+                                    loadProductsByCategory();
+                                }
+                            }}
+                        >
+                            <View style={[
+                                dynamicStyles.organicToggleCircle,
+                                { 
+                                    backgroundColor: organicFilter ? '#FFFFFF' : colors.border,
+                                    transform: [{ translateX: organicFilter ? 20 : 0 }]
+                                }
+                            ]} />
+                        </TouchableOpacity>
                     </View>
 
                     {/* Category Filter */}
@@ -217,9 +258,16 @@ const UserShopScreen = () => {
                                                     <Text style={dynamicStyles.productEmoji}>🌾</Text>
                                                 )}
                                             </View>
-                                            <Text style={[dynamicStyles.productName, { color: colors.text }]} numberOfLines={1}>
-                                                {product.name}
-                                            </Text>
+                                            <View style={dynamicStyles.productNameRow}>
+                                                <Text style={[dynamicStyles.productName, { color: colors.text }]} numberOfLines={1}>
+                                                    {product.name}
+                                                </Text>
+                                                {product.is_organic && (
+                                                    <View style={[dynamicStyles.organicBadge, { backgroundColor: '#4CAF50' + '20' }]}>
+                                                        <Text style={[dynamicStyles.organicBadgeText, { color: '#4CAF50' }]}>🌿</Text>
+                                                    </View>
+                                                )}
+                                            </View>
                                             <Text style={[dynamicStyles.productStore, { color: colors.textSecondary }]} numberOfLines={1}>
                                                 {product.user_profiles?.full_name || 'Farmer'}
                                             </Text>
