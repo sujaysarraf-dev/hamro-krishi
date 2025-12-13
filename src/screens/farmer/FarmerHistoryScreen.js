@@ -4,11 +4,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../config/supabase';
 import { useFocusEffect } from 'expo-router';
+import SweetAlert from '../../components/SweetAlert';
 
 const FarmerHistoryScreen = () => {
     const { colors, isDark } = useTheme();
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [alert, setAlert] = useState({ visible: false, type: 'info', title: '', message: '' });
+    const [processingOrder, setProcessingOrder] = useState(null);
 
     useFocusEffect(
         React.useCallback(() => {
@@ -118,8 +121,128 @@ const FarmerHistoryScreen = () => {
                 return '#8B5CF6';
             case 'cancelled':
                 return '#EF4444';
+            case 'pending':
+                return '#F59E0B';
             default:
                 return colors.textSecondary;
+        }
+    };
+
+    const handleAcceptOrder = async (order) => {
+        try {
+            setProcessingOrder(order.id);
+            const { data: { user } } = await supabase.auth.getUser();
+            
+            if (!user) {
+                throw new Error('User not authenticated');
+            }
+
+            // Check if order contains products from this farmer
+            const { data: orderItems } = await supabase
+                .from('order_items')
+                .select('product_id, products!inner(farmer_id)')
+                .eq('order_id', order.id);
+
+            const hasFarmerProducts = orderItems?.some(item => item.products?.farmer_id === user.id);
+
+            if (!hasFarmerProducts) {
+                throw new Error('You do not have permission to update this order');
+            }
+
+            const { data, error } = await supabase
+                .from('orders')
+                .update({ status: 'confirmed' })
+                .eq('id', order.id)
+                .select();
+
+            if (error) {
+                console.error('Accept order error:', error);
+                throw error;
+            }
+
+            if (!data || data.length === 0) {
+                throw new Error('Failed to update order');
+            }
+
+            setAlert({
+                visible: true,
+                type: 'success',
+                title: 'Order Accepted',
+                message: 'Order has been accepted successfully!',
+                onConfirm: () => {
+                    setAlert({ ...alert, visible: false });
+                    loadOrders();
+                }
+            });
+        } catch (error) {
+            console.error('Error accepting order:', error);
+            setAlert({
+                visible: true,
+                type: 'error',
+                title: 'Error',
+                message: error.message || 'Failed to accept order. Please try again.'
+            });
+        } finally {
+            setProcessingOrder(null);
+        }
+    };
+
+    const handleRejectOrder = async (order) => {
+        try {
+            setProcessingOrder(order.id);
+            const { data: { user } } = await supabase.auth.getUser();
+            
+            if (!user) {
+                throw new Error('User not authenticated');
+            }
+
+            // Check if order contains products from this farmer
+            const { data: orderItems } = await supabase
+                .from('order_items')
+                .select('product_id, products!inner(farmer_id)')
+                .eq('order_id', order.id);
+
+            const hasFarmerProducts = orderItems?.some(item => item.products?.farmer_id === user.id);
+
+            if (!hasFarmerProducts) {
+                throw new Error('You do not have permission to update this order');
+            }
+
+            const { data, error } = await supabase
+                .from('orders')
+                .update({ status: 'cancelled' })
+                .eq('id', order.id)
+                .select();
+
+            if (error) {
+                console.error('Reject order error:', error);
+                throw error;
+            }
+
+            if (!data || data.length === 0) {
+                throw new Error('Failed to update order');
+            }
+
+            setAlert({
+                visible: true,
+                type: 'success',
+                title: 'Order Rejected',
+                message: 'Order has been rejected successfully!',
+                onConfirm: () => {
+                    setAlert({ ...alert, visible: false });
+                    loadOrders();
+                }
+            });
+        } catch (error) {
+            console.error('Error rejecting order:', error);
+            setAlert({
+                visible: true,
+                type: 'error',
+                title: 'Error',
+                message: error.message || 'Failed to reject order. Please try again.'
+            });
+        } finally {
+            setProcessingOrder(null);
         }
     };
 
@@ -187,11 +310,50 @@ const FarmerHistoryScreen = () => {
                                         NPR {formatPrice(order.total_amount)}
                                     </Text>
                                 </View>
+
+                                {/* Accept/Reject Buttons for Pending Orders */}
+                                {order.status === 'pending' && (
+                                    <View style={dynamicStyles.actionButtonsContainer}>
+                                        <TouchableOpacity
+                                            style={[dynamicStyles.rejectButton, { backgroundColor: '#EF4444' }, processingOrder === order.id && dynamicStyles.buttonDisabled]}
+                                            onPress={() => handleRejectOrder(order)}
+                                            disabled={processingOrder === order.id}
+                                        >
+                                            {processingOrder === order.id ? (
+                                                <ActivityIndicator color="#FFFFFF" size="small" />
+                                            ) : (
+                                                <Text style={dynamicStyles.actionButtonText}>Reject</Text>
+                                            )}
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={[dynamicStyles.acceptButton, { backgroundColor: '#10B981' }, processingOrder === order.id && dynamicStyles.buttonDisabled]}
+                                            onPress={() => handleAcceptOrder(order)}
+                                            disabled={processingOrder === order.id}
+                                        >
+                                            {processingOrder === order.id ? (
+                                                <ActivityIndicator color="#FFFFFF" size="small" />
+                                            ) : (
+                                                <Text style={dynamicStyles.actionButtonText}>Accept</Text>
+                                            )}
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
                             </View>
                         ))}
                     </View>
                 </ScrollView>
             )}
+
+            <SweetAlert
+                visible={alert.visible}
+                type={alert.type}
+                title={alert.title}
+                message={alert.message}
+                onConfirm={() => {
+                    setAlert({ ...alert, visible: false });
+                    if (alert.onConfirm) alert.onConfirm();
+                }}
+            />
         </SafeAreaView>
     );
 };
@@ -315,6 +477,36 @@ const getStyles = (colors, isDark) => StyleSheet.create({
         fontSize: 18,
         fontWeight: '700',
         color: colors.primary,
+    },
+    actionButtonsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 16,
+        gap: 12,
+    },
+    acceptButton: {
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#10B981',
+    },
+    rejectButton: {
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#EF4444',
+    },
+    buttonDisabled: {
+        opacity: 0.6,
+    },
+    actionButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '600',
     },
 });
 

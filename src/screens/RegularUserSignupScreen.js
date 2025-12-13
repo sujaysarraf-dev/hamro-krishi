@@ -55,7 +55,8 @@ const RegularUserSignupScreen = () => {
                         full_name: fullName.trim(),
                         role: 'regular'
                     },
-                    emailRedirectTo: undefined // Disable email confirmation redirect
+                    emailRedirectTo: undefined, // Disable email confirmation redirect
+                    captchaToken: undefined // Disable captcha if not needed
                 }
             });
 

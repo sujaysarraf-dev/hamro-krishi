@@ -26,30 +26,57 @@ const FarmerProfileScreen = () => {
 
     const loadUserData = async () => {
         try {
-            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-            
-            if (sessionError) {
-                console.error('Session error:', sessionError);
-            }
-
-            if (!session) {
-                console.log('No session found, redirecting to login');
-                router.replace('/farmer-login');
-                return;
-            }
-
+            // Get current user first (more reliable than getSession)
             const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
             
             if (userError) {
                 console.error('Error getting user:', userError);
-                throw userError;
+                // Only redirect if it's an auth error, not a network error
+                if (userError.message?.includes('JWT') || userError.message?.includes('session') || userError.message?.includes('token')) {
+                    console.log('Auth error, redirecting to login');
+                    router.replace('/farmer-login');
+                    return;
+                }
+                // For other errors, just log and continue
+                console.log('Non-auth error, continuing...');
             }
 
             if (!currentUser) {
-                throw new Error('User not found');
+                // Double check with session before redirecting
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session) {
+                    console.log('No user and no session, redirecting to login');
+                    router.replace('/farmer-login');
+                    return;
+                }
+                // If session exists but no user, wait a bit and retry (might be refreshing)
+                await new Promise(resolve => setTimeout(resolve, 500));
+                const { data: { user: retryUser } } = await supabase.auth.getUser();
+                if (!retryUser) {
+                    console.log('Still no user after retry, redirecting to login');
+                    router.replace('/farmer-login');
+                    return;
+                }
+                setUser(retryUser);
+                // Continue with retryUser
+                await loadProfileData(retryUser);
+                return;
             }
 
             setUser(currentUser);
+            
+            // Continue with profile loading
+            await loadProfileData(currentUser);
+        } catch (error) {
+            console.error('Error loading user data:', error);
+            // Don't redirect on error, just log and show what we have
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const loadProfileData = async (currentUser) => {
+        try {
 
             const { data: profileData, error: profileError } = await supabase
                 .from('user_profiles')
@@ -98,9 +125,8 @@ const FarmerProfileScreen = () => {
                 }
             }
         } catch (error) {
-            console.error('Error loading user data:', error);
-        } finally {
-            setLoading(false);
+            console.error('Error loading profile data:', error);
+            // Don't show alert, just log the error
         }
     };
 

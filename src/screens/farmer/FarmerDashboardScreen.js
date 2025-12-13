@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import FarmerHomeScreen from './FarmerHomeScreen';
 import FarmerProductsScreen from './FarmerProductsScreen';
+import FarmerDiscussionScreen from './FarmerDiscussionScreen';
 import FarmerHistoryScreen from './FarmerHistoryScreen';
 import FarmerProfileScreen from './FarmerProfileScreen';
 
@@ -17,6 +18,8 @@ const FarmerDashboardScreen = () => {
                 return <FarmerHomeScreen />;
             case 'products':
                 return <FarmerProductsScreen />;
+            case 'discussion':
+                return <FarmerDiscussionScreen />;
             case 'orders':
                 return <FarmerHistoryScreen />;
             case 'profile':
@@ -50,6 +53,14 @@ const FarmerDashboardScreen = () => {
                     </View>
                     <Text style={[dynamicStyles.navLabel, activeTab === 'products' && { color: colors.primary, fontWeight: '600' }]}>
                         Products
+                    </Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={dynamicStyles.navItem} onPress={() => setActiveTab('discussion')}>
+                    <View style={dynamicStyles.navIconContainer}>
+                        <Text style={[dynamicStyles.navIcon, { opacity: activeTab === 'discussion' ? 1 : 0.6 }]}>💬</Text>
+                    </View>
+                    <Text style={[dynamicStyles.navLabel, activeTab === 'discussion' && { color: colors.primary, fontWeight: '600' }]}>
+                        Discussion
                     </Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={dynamicStyles.navItem} onPress={() => setActiveTab('orders')}>
