@@ -5,6 +5,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useFocusEffect } from 'expo-router';
 import { supabase } from '../../config/supabase';
 import * as Location from 'expo-location';
+import { reverseGeocode } from '../../utils/geocoding';
 
 const { width } = Dimensions.get('window');
 const WEATHERBIT_API_KEY = 'b6d691f2b36741c0b7d036f5c88b7d30';
@@ -101,54 +102,18 @@ const FarmerHomeScreen = ({ onNavigateToWeather, onNavigateToCalendar, onNavigat
 
             setLocation(currentLocation.coords);
 
-            // Reverse geocode to get location name in English
-            const reverseGeocode = await Location.reverseGeocodeAsync({
-                latitude: currentLocation.coords.latitude,
-                longitude: currentLocation.coords.longitude,
-                language: 'en', // Request English language
-            });
-
-            if (reverseGeocode && reverseGeocode.length > 0) {
-                const address = reverseGeocode[0];
-                const locationParts = [];
-                
-                // Add street/suburb/neighborhood first (most specific)
-                if (address.street) {
-                    locationParts.push(address.street);
-                } else if (address.district) {
-                    locationParts.push(address.district);
-                } else if (address.subregion) {
-                    locationParts.push(address.subregion);
-                } else if (address.name) {
-                    locationParts.push(address.name);
-                }
-                
-                // Add city
-                if (address.city) {
-                    locationParts.push(address.city);
-                }
-                
-                // Add region/state if different from city
-                if (address.region && address.region !== address.city) {
-                    locationParts.push(address.region);
-                }
-                
-                // Add country only if we don't have enough info
-                if (locationParts.length === 0 && address.country) {
-                    locationParts.push(address.country);
-                }
-                
-                const preciseLocation = locationParts.length > 0 ? locationParts.join(', ') : 'Current Location';
-                setLocationName(preciseLocation);
-                
-                // Update detailed weather data with precise location
-                setDetailedWeatherData(prev => prev ? {
-                    ...prev,
-                    cityName: preciseLocation,
-                } : null);
-            } else {
-                setLocationName('Current Location');
-            }
+            // Use OpenStreetMap Nominatim for reverse geocoding
+            const preciseLocation = await reverseGeocode(
+                currentLocation.coords.latitude,
+                currentLocation.coords.longitude
+            );
+            setLocationName(preciseLocation);
+            
+            // Update detailed weather data with precise location
+            setDetailedWeatherData(prev => prev ? {
+                ...prev,
+                cityName: preciseLocation,
+            } : null);
 
             // Fetch weather data
             await fetchWeatherData(currentLocation.coords.latitude, currentLocation.coords.longitude);

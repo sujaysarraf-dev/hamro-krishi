@@ -1,9 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, BackHandler, Modal, Image, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, BackHandler, Modal, Image, Dimensions, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
-import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
+
+// Conditionally import expo-video - it may not work on web
+let VideoView = null;
+// Always provide a fallback function to avoid conditional hook calls
+let useVideoPlayer = () => null;
+
+// Only try to import expo-video on native platforms to avoid web build errors
+if (Platform.OS !== 'web') {
+    try {
+        const expoVideo = require('expo-video');
+        if (expoVideo && expoVideo.VideoView && expoVideo.useVideoPlayer) {
+            VideoView = expoVideo.VideoView;
+            useVideoPlayer = expoVideo.useVideoPlayer;
+        }
+    } catch (error) {
+        console.warn('expo-video not available:', error);
+        // useVideoPlayer already has a fallback function
+    }
+}
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -12,6 +30,7 @@ const FarmerLearnScreen = ({ onNavigateBack }) => {
     const { colors, isDark } = useTheme();
     const [selectedCrop, setSelectedCrop] = useState(null);
     const [showCropModal, setShowCropModal] = useState(false);
+    const [videoSource, setVideoSource] = useState(null);
 
     useEffect(() => {
         const backAction = () => {
@@ -27,27 +46,62 @@ const FarmerLearnScreen = ({ onNavigateBack }) => {
         return () => backHandler.remove();
     }, [onNavigateBack, router]);
 
+    // Update video source when crop changes
     useEffect(() => {
-        // Reset video state when modal opens
-        if (showCropModal && selectedCrop?.hasVideo) {
-            setVideoError(false);
-            setVideoLoading(true);
+        if (selectedCrop?.hasVideo && selectedCrop?.videoPath) {
+            setVideoSource(selectedCrop.videoPath);
+        } else {
+            setVideoSource(null);
         }
-        
-        // Cleanup video when modal closes
-        return () => {
-            if (!showCropModal && videoRef.current) {
-                videoRef.current.unloadAsync().catch(() => {});
-            }
-        };
-    }, [showCropModal, selectedCrop]);
+    }, [selectedCrop]);
 
-    const videoRef = useRef(null);
-    const [videoStatus, setVideoStatus] = useState({});
+    // Create video player instance - always call hook to follow React rules
+    // useVideoPlayer is always defined (fallback function on web)
+    const videoPlayer = useVideoPlayer(videoSource || null, (player) => {
+        if (player && videoSource) {
+            player.loop = false;
+            player.muted = false;
+            player.volume = 1.0;
+        }
+    });
+
     const [videoError, setVideoError] = useState(false);
     const [videoLoading, setVideoLoading] = useState(true);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
+
+    useEffect(() => {
+        // Reset video state when modal opens
+        if (showCropModal && selectedCrop?.hasVideo && videoSource) {
+            setVideoError(false);
+            setVideoLoading(true);
+            setIsPlaying(false);
+            if (videoPlayer) {
+                videoPlayer.pause();
+                videoPlayer.seekTo(0);
+            }
+        }
+    }, [showCropModal, selectedCrop, videoSource, videoPlayer]);
+
+    // Listen to player status changes
+    useEffect(() => {
+        if (!videoPlayer || !videoSource) return;
+
+        const subscription = videoPlayer.addListener('statusChange', (status) => {
+            setIsPlaying(status.isPlaying);
+            if (status.status === 'readyToPlay') {
+                setVideoLoading(false);
+                setVideoError(false);
+            } else if (status.status === 'error') {
+                setVideoError(true);
+                setVideoLoading(false);
+            }
+        });
+
+        return () => {
+            subscription.remove();
+        };
+    }, [videoPlayer, videoSource]);
 
     const crops = [
         {
@@ -331,29 +385,26 @@ const FarmerLearnScreen = ({ onNavigateBack }) => {
         setVideoLoading(false);
     };
 
-    const handlePlayButtonPress = async () => {
+    const handlePlayButtonPress = () => {
         try {
-            if (videoRef.current) {
-                // Enter fullscreen and start playing
-                await videoRef.current.presentFullscreenPlayer();
-                setIsFullscreen(true);
-                await videoRef.current.playAsync();
+            if (videoPlayer) {
+                videoPlayer.play();
                 setIsPlaying(true);
+                setIsFullscreen(true);
             }
         } catch (error) {
             console.error('Error starting video:', error);
         }
     };
 
-    const togglePlayPause = async () => {
+    const togglePlayPause = () => {
         try {
-            if (videoRef.current) {
-                const status = await videoRef.current.getStatusAsync();
-                if (status.isPlaying) {
-                    await videoRef.current.pauseAsync();
+            if (videoPlayer) {
+                if (videoPlayer.playing) {
+                    videoPlayer.pause();
                     setIsPlaying(false);
                 } else {
-                    await videoRef.current.playAsync();
+                    videoPlayer.play();
                     setIsPlaying(true);
                 }
             }
@@ -362,38 +413,8 @@ const FarmerLearnScreen = ({ onNavigateBack }) => {
         }
     };
 
-    const toggleFullscreen = async () => {
-        try {
-            if (videoRef.current) {
-                if (isFullscreen) {
-                    await videoRef.current.dismissFullscreenPlayer();
-                    setIsFullscreen(false);
-                } else {
-                    await videoRef.current.presentFullscreenPlayer();
-                    setIsFullscreen(true);
-                }
-            }
-        } catch (error) {
-            console.error('Error toggling fullscreen:', error);
-        }
-    };
-
-    const formatTime = (milliseconds) => {
-        if (!milliseconds) return '0:00';
-        const totalSeconds = Math.floor(milliseconds / 1000);
-        const minutes = Math.floor(totalSeconds / 60);
-        const seconds = totalSeconds % 60;
-        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    };
-
-    const seekVideo = async (position) => {
-        try {
-            if (videoRef.current) {
-                await videoRef.current.setPositionAsync(position);
-            }
-        } catch (error) {
-            console.error('Error seeking video:', error);
-        }
+    const toggleFullscreen = () => {
+        setIsFullscreen(!isFullscreen);
     };
 
     const dynamicStyles = getStyles(colors, isDark);
@@ -503,8 +524,8 @@ const FarmerLearnScreen = ({ onNavigateBack }) => {
                                                     onPress={() => {
                                                         setVideoError(false);
                                                         setVideoLoading(true);
-                                                        if (videoRef.current) {
-                                                            videoRef.current.reloadAsync();
+                                                        if (videoPlayer) {
+                                                            videoPlayer.replay();
                                                         }
                                                     }}
                                                     style={[dynamicStyles.retryButton, { backgroundColor: colors.primary }]}
@@ -512,44 +533,18 @@ const FarmerLearnScreen = ({ onNavigateBack }) => {
                                                     <Text style={dynamicStyles.retryButtonText}>Retry</Text>
                                                 </TouchableOpacity>
                                             </View>
-                                        ) : (
+                                        ) : videoPlayer && videoSource && VideoView ? (
                                             <View style={dynamicStyles.videoWrapper}>
-                                                <Video
-                                                    ref={videoRef}
+                                                <VideoView
+                                                    player={videoPlayer}
                                                     style={dynamicStyles.video}
-                                                    source={selectedCrop.videoPath}
-                                                    useNativeControls={isFullscreen}
-                                                    resizeMode={ResizeMode.CONTAIN}
-                                                    isLooping={false}
-                                                    shouldPlay={false}
-                                                    isMuted={false}
-                                                    volume={1.0}
+                                                    nativeControls={isFullscreen}
+                                                    contentFit="contain"
                                                     allowsFullscreen={true}
-                                                    shouldRasterizeIOS={false}
+                                                    allowsPictureInPicture={false}
+                                                    onLoadStart={() => setVideoLoading(true)}
                                                     onLoad={handleVideoLoad}
                                                     onError={handleVideoError}
-                                                    onPlaybackStatusUpdate={(status) => {
-                                                        setVideoStatus(status);
-                                                        setIsPlaying(status.isPlaying || false);
-                                                        if (status.didJustFinish) {
-                                                            setVideoLoading(false);
-                                                            setIsPlaying(false);
-                                                            // Exit fullscreen when video ends
-                                                            if (isFullscreen && videoRef.current) {
-                                                                videoRef.current.dismissFullscreenPlayer().catch(() => {});
-                                                                setIsFullscreen(false);
-                                                            }
-                                                        }
-                                                    }}
-                                                    onLoadStart={() => setVideoLoading(true)}
-                                                    onReadyForDisplay={() => setVideoLoading(false)}
-                                                    onFullscreenUpdate={(event) => {
-                                                        if (event.fullscreenUpdate === 1) {
-                                                            setIsFullscreen(true);
-                                                        } else if (event.fullscreenUpdate === 3) {
-                                                            setIsFullscreen(false);
-                                                        }
-                                                    }}
                                                 />
                                                 {!isFullscreen && !videoLoading && !videoError && (
                                                     <TouchableOpacity
@@ -562,6 +557,13 @@ const FarmerLearnScreen = ({ onNavigateBack }) => {
                                                         </View>
                                                     </TouchableOpacity>
                                                 )}
+                                            </View>
+                                        ) : (
+                                            <View style={dynamicStyles.videoErrorContainer}>
+                                                <Text style={dynamicStyles.videoErrorIcon}>⚠️</Text>
+                                                <Text style={[dynamicStyles.videoErrorText, { color: colors.textSecondary }]}>
+                                                    Video player not available
+                                                </Text>
                                             </View>
                                         )}
                                     </View>

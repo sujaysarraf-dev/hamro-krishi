@@ -261,12 +261,35 @@ const FarmerProductsScreen = () => {
     };
 
     const handleSaveProduct = async () => {
-        if (!formData.name.trim() || !formData.price.trim() || !formData.stockQuantity.trim()) {
+        const trimmedName = formData.name.trim();
+        
+        if (!trimmedName || !formData.price.trim() || !formData.stockQuantity.trim()) {
             setAlert({
                 visible: true,
                 type: 'warning',
                 title: 'Validation Error',
                 message: 'Please fill in all required fields (Name, Price, Stock Quantity).',
+            });
+            return;
+        }
+
+        // Validate product name: must be at least 3 characters and not just numbers
+        if (trimmedName.length < 3) {
+            setAlert({
+                visible: true,
+                type: 'warning',
+                title: 'Invalid Product Name',
+                message: 'Product name must be at least 3 characters long.',
+            });
+            return;
+        }
+
+        if (/^\d+$/.test(trimmedName)) {
+            setAlert({
+                visible: true,
+                type: 'warning',
+                title: 'Invalid Product Name',
+                message: 'Product name cannot be just numbers. Please enter a valid crop/product name (e.g., Rice, Wheat, Tomato).',
             });
             return;
         }

@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, BackHandler } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, BackHandler, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { supabase } from '../../config/supabase';
+import { getAICropAdvisory } from '../../services/geminiService';
+import { reverseGeocode } from '../../utils/geocoding';
 
 const WEATHERBIT_API_KEY = 'b6d691f2b36741c0b7d036f5c88b7d30';
 
@@ -33,6 +35,8 @@ const FarmerWeatherScreen = ({ onNavigateBack }) => {
     const [weatherData, setWeatherData] = useState(null);
     const [forecastData, setForecastData] = useState([]);
     const [cropAdvisory, setCropAdvisory] = useState([]);
+    const [aiAdvisory, setAiAdvisory] = useState(null);
+    const [loadingAI, setLoadingAI] = useState(false);
     const [userProducts, setUserProducts] = useState([]);
 
     useEffect(() => {
@@ -55,7 +59,17 @@ const FarmerWeatherScreen = ({ onNavigateBack }) => {
                 .eq('farmer_id', user.id)
                 .eq('status', 'Active');
 
-            setUserProducts(products || []);
+            // Filter out products with invalid names (e.g., just numbers or empty)
+            const validProducts = (products || []).filter(product => {
+                const name = product.name?.trim();
+                // Check if name exists, is not empty, and is not just a number
+                return name && 
+                       name.length > 0 && 
+                       !/^\d+$/.test(name) && // Not just digits
+                       name.length > 2; // At least 3 characters
+            });
+
+            setUserProducts(validProducts);
         } catch (error) {
             console.error('Error loading products:', error);
         }
@@ -78,28 +92,12 @@ const FarmerWeatherScreen = ({ onNavigateBack }) => {
 
             setLocation(currentLocation.coords);
 
-            const reverseGeocode = await Location.reverseGeocodeAsync({
-                latitude: currentLocation.coords.latitude,
-                longitude: currentLocation.coords.longitude,
-                language: 'en',
-            });
-
-            if (reverseGeocode && reverseGeocode.length > 0) {
-                const address = reverseGeocode[0];
-                const locationParts = [];
-                
-                if (address.street) locationParts.push(address.street);
-                else if (address.district) locationParts.push(address.district);
-                else if (address.subregion) locationParts.push(address.subregion);
-                
-                if (address.city) locationParts.push(address.city);
-                if (address.region && address.region !== address.city) locationParts.push(address.region);
-                
-                const preciseLocation = locationParts.length > 0 ? locationParts.join(', ') : 'Current Location';
-                setLocationName(preciseLocation);
-            } else {
-                setLocationName('Current Location');
-            }
+            // Use OpenStreetMap Nominatim for reverse geocoding
+            const locationName = await reverseGeocode(
+                currentLocation.coords.latitude,
+                currentLocation.coords.longitude
+            );
+            setLocationName(locationName);
 
             await fetchWeatherData(currentLocation.coords.latitude, currentLocation.coords.longitude);
         } catch (error) {
@@ -250,6 +248,38 @@ const FarmerWeatherScreen = ({ onNavigateBack }) => {
         setCropAdvisory(advisories);
     };
 
+    const fetchAIAdvisory = async () => {
+        if (!weatherData || !locationName) {
+            return;
+        }
+        
+        if (!userProducts || userProducts.length === 0) {
+            Alert.alert(
+                'No Crops Added',
+                'Please add crops in the Products section first to get personalized AI advice.',
+                [{ text: 'OK' }]
+            );
+            return;
+        }
+        
+        setLoadingAI(true);
+        setAiAdvisory(null);
+        try {
+            const advisory = await getAICropAdvisory(
+                weatherData,
+                userProducts,
+                locationName
+            );
+            if (advisory) {
+                setAiAdvisory(advisory);
+            }
+        } catch (error) {
+            console.error('Error fetching AI advisory:', error);
+        } finally {
+            setLoadingAI(false);
+        }
+    };
+
     const getWeatherIcon = (iconCode) => {
         if (!iconCode) return '☀️';
         const code = iconCode.toLowerCase();
@@ -391,6 +421,80 @@ const FarmerWeatherScreen = ({ onNavigateBack }) => {
                             ))}
                         </View>
                     )}
+
+                    {/* AI-Powered Advisory Section */}
+                    <View style={dynamicStyles.section}>
+                        <View style={dynamicStyles.sectionHeader}>
+                            <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>🤖 AI-Powered Advisory</Text>
+                            <TouchableOpacity
+                                onPress={fetchAIAdvisory}
+                                disabled={loadingAI || !weatherData}
+                                style={[
+                                    dynamicStyles.aiButton,
+                                    { backgroundColor: colors.primary },
+                                    (loadingAI || !weatherData) && { opacity: 0.5 }
+                                ]}
+                            >
+                                {loadingAI ? (
+                                    <ActivityIndicator size="small" color="#FFFFFF" />
+                                ) : (
+                                    <Text style={dynamicStyles.aiButtonText}>Get AI Advice</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                        
+                        {/* Show user's products */}
+                        {userProducts && userProducts.length > 0 && (
+                            <View style={[dynamicStyles.productsInfoCard, { backgroundColor: colors.surface }]}>
+                                <Text style={[dynamicStyles.productsInfoLabel, { color: colors.textSecondary }]}>
+                                    Your Crops:
+                                </Text>
+                                <View style={dynamicStyles.productsList}>
+                                    {userProducts.map((product, index) => {
+                                        // Ensure product name is valid and not just a number
+                                        const productName = product.name?.trim() || 'Unknown Crop';
+                                        const isValidName = productName && !/^\d+$/.test(productName) && productName.length > 2;
+                                        
+                                        if (!isValidName) return null; // Skip invalid products
+                                        
+                                        return (
+                                            <View key={`${product.name}-${index}`} style={[dynamicStyles.productTag, { backgroundColor: colors.primary + '20' }]}>
+                                                <Text style={[dynamicStyles.productTagText, { color: colors.primary }]}>
+                                                    {productName}
+                                                    {product.category && ` (${product.category})`}
+                                                </Text>
+                                            </View>
+                                        );
+                                    })}
+                                </View>
+                            </View>
+                        )}
+                        
+                        {userProducts && userProducts.length === 0 && (
+                            <View style={[dynamicStyles.productsInfoCard, { backgroundColor: colors.surface }]}>
+                                <Text style={[dynamicStyles.productsInfoLabel, { color: colors.textSecondary }]}>
+                                    ⚠️ No crops added yet. Add crops in the Products section to get personalized advice.
+                                </Text>
+                            </View>
+                        )}
+                        
+                        {aiAdvisory && (
+                            <View style={[dynamicStyles.aiAdvisoryCard, { backgroundColor: colors.card }]}>
+                                <Text style={[dynamicStyles.aiAdvisoryText, { color: colors.text }]}>
+                                    {aiAdvisory}
+                                </Text>
+                            </View>
+                        )}
+                        {!aiAdvisory && !loadingAI && (
+                            <View style={[dynamicStyles.aiAdvisoryCard, { backgroundColor: colors.card }]}>
+                                <Text style={[dynamicStyles.aiAdvisoryPlaceholder, { color: colors.textSecondary }]}>
+                                    {userProducts && userProducts.length > 0 
+                                        ? `Tap "Get AI Advice" to receive personalized farming recommendations for your crops: ${userProducts.map(p => p.name).join(', ')}`
+                                        : 'Add crops in the Products section, then tap "Get AI Advice" for personalized recommendations.'}
+                                </Text>
+                            </View>
+                        )}
+                    </View>
 
                     {/* 7-Day Forecast */}
                     {forecastData.length > 0 && (
@@ -557,6 +661,64 @@ const getStyles = (colors, isDark) => StyleSheet.create({
     advisoryMessage: {
         fontSize: 14,
         lineHeight: 20,
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    aiButton: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    aiButtonText: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    aiAdvisoryCard: {
+        borderRadius: 12,
+        padding: 16,
+        marginTop: 8,
+    },
+    aiAdvisoryText: {
+        fontSize: 14,
+        lineHeight: 22,
+    },
+    aiAdvisoryPlaceholder: {
+        fontSize: 14,
+        lineHeight: 20,
+        fontStyle: 'italic',
+    },
+    productsInfoCard: {
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 12,
+    },
+    productsInfoLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        marginBottom: 8,
+    },
+    productsList: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    productTag: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 16,
+        marginRight: 8,
+        marginBottom: 4,
+    },
+    productTagText: {
+        fontSize: 13,
+        fontWeight: '600',
     },
     forecastCard: {
         borderRadius: 12,
