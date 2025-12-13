@@ -1,9 +1,10 @@
 
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { supabase } from '../config/supabase';
+import SweetAlert from '../components/SweetAlert';
 
 const FarmerLoginScreen = () => {
     const router = useRouter();
@@ -11,6 +12,7 @@ const FarmerLoginScreen = () => {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [alert, setAlert] = useState({ visible: false, type: 'info', title: '', message: '' });
 
     // Helper function to check if input is email or phone
     const isEmail = (input) => {
@@ -19,7 +21,7 @@ const FarmerLoginScreen = () => {
 
     const handleLogin = async () => {
         if (!email.trim() || !password.trim()) {
-            Alert.alert('Error', 'Please fill in all fields');
+            setAlert({ visible: true, type: 'error', title: 'Error', message: 'Please fill in all fields' });
             return;
         }
 
@@ -36,8 +38,8 @@ const FarmerLoginScreen = () => {
             } else {
                 // For phone number, we'll use email field but you might need to adjust based on your Supabase setup
                 // Alternatively, you can use phone authentication if configured
-                Alert.alert('Error', 'Please use email for login. Phone authentication coming soon.');
                 setLoading(false);
+                setAlert({ visible: true, type: 'warning', title: 'Error', message: 'Please use email for login. Phone authentication coming soon.' });
                 return;
             }
 
@@ -65,16 +67,20 @@ const FarmerLoginScreen = () => {
                     console.error('Error saving profile:', profileError);
                 }
 
-                Alert.alert('Success', 'Login successful!', [
-                    { text: 'OK', onPress: () => {
+                setAlert({
+                    visible: true,
+                    type: 'success',
+                    title: 'Success',
+                    message: 'Login successful!',
+                    onConfirm: () => {
                         // Navigate to dashboard or home screen
                         // router.replace('/farmer-dashboard');
                         console.log('User logged in:', user);
-                    }}
-                ]);
+                    }
+                });
             }
         } catch (error) {
-            Alert.alert('Login Failed', error.message || 'An error occurred during login');
+            setAlert({ visible: true, type: 'error', title: 'Login Failed', message: error.message || 'An error occurred during login' });
         } finally {
             setLoading(false);
         }
@@ -181,6 +187,18 @@ const FarmerLoginScreen = () => {
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
+            <SweetAlert
+                visible={alert.visible}
+                type={alert.type}
+                title={alert.title}
+                message={alert.message}
+                onConfirm={() => {
+                    setAlert({ ...alert, visible: false });
+                    if (alert.onConfirm) {
+                        alert.onConfirm();
+                    }
+                }}
+            />
         </SafeAreaView>
     );
 };

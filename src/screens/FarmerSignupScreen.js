@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { supabase } from '../config/supabase';
+import SweetAlert from '../components/SweetAlert';
 
 const FarmerSignupScreen = () => {
     const router = useRouter();
@@ -13,27 +14,28 @@ const FarmerSignupScreen = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [alert, setAlert] = useState({ visible: false, type: 'info', title: '', message: '' });
 
     const handleSignup = async () => {
         if (!fullName.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
-            Alert.alert('Error', 'Please fill in all fields');
+            setAlert({ visible: true, type: 'error', title: 'Error', message: 'Please fill in all fields' });
             return;
         }
 
         if (password !== confirmPassword) {
-            Alert.alert('Error', 'Passwords do not match');
+            setAlert({ visible: true, type: 'error', title: 'Error', message: 'Passwords do not match' });
             return;
         }
 
         if (password.length < 6) {
-            Alert.alert('Error', 'Password must be at least 6 characters');
+            setAlert({ visible: true, type: 'error', title: 'Error', message: 'Password must be at least 6 characters' });
             return;
         }
 
         // Validate email format
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
-            Alert.alert('Error', 'Please enter a valid email address');
+            setAlert({ visible: true, type: 'error', title: 'Error', message: 'Please enter a valid email address' });
             return;
         }
 
@@ -70,12 +72,16 @@ const FarmerSignupScreen = () => {
                     console.error('Error creating profile:', profileError);
                 }
 
-                Alert.alert('Success', 'Account created successfully! Please check your email to verify your account.', [
-                    { text: 'OK', onPress: () => router.replace('/farmer-login') }
-                ]);
+                setAlert({
+                    visible: true,
+                    type: 'success',
+                    title: 'Success',
+                    message: 'Account created successfully! Please check your email to verify your account.',
+                    onConfirm: () => router.replace('/farmer-login')
+                });
             }
         } catch (error) {
-            Alert.alert('Signup Failed', error.message || 'An error occurred during signup');
+            setAlert({ visible: true, type: 'error', title: 'Signup Failed', message: error.message || 'An error occurred during signup' });
         } finally {
             setLoading(false);
         }
@@ -215,6 +221,18 @@ const FarmerSignupScreen = () => {
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
+            <SweetAlert
+                visible={alert.visible}
+                type={alert.type}
+                title={alert.title}
+                message={alert.message}
+                onConfirm={() => {
+                    setAlert({ ...alert, visible: false });
+                    if (alert.onConfirm) {
+                        alert.onConfirm();
+                    }
+                }}
+            />
         </SafeAreaView>
     );
 };
