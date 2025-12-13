@@ -73,9 +73,8 @@ const FarmerLoginScreen = () => {
                     title: 'Success',
                     message: 'Login successful!',
                     onConfirm: () => {
-                        // Navigate to dashboard or home screen
-                        // router.replace('/farmer-dashboard');
-                        console.log('User logged in:', user);
+                        // Navigate to interest selection screen
+                        router.replace('/farmer-interests');
                     }
                 });
             }

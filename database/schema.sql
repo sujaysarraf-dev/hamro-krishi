@@ -126,3 +126,9 @@ CREATE TRIGGER update_farms_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION public.handle_updated_at();
 
+-- Add interests column as JSONB to store interests as JSON array
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS interests JSONB DEFAULT '[]'::jsonb;
+
+-- Create index on interests for faster queries (GIN index for JSONB)
+CREATE INDEX IF NOT EXISTS idx_user_profiles_interests ON user_profiles USING GIN (interests);
+

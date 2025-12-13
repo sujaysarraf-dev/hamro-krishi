@@ -1,12 +1,8 @@
 
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-
-// Removed Ionicons import if not used or install it if needed.
-// To use Ionicons with Expo, we usually: import Ionicons from '@expo/vector-icons/Ionicons';
-// But user said "random images", so I'll stick to images.
 
 const { width } = Dimensions.get('window');
 
@@ -28,10 +24,9 @@ const RoleSelectionScreen = () => {
                         onPress={() => setSelectedRole('Farmer')}
                     >
                         <Text style={[styles.cardTitle, selectedRole === 'Farmer' && styles.selectedCardTitle]}>Farmer</Text>
-                        <Image
-                            source={{ uri: 'https://picsum.photos/150/150?random=2' }}
-                            style={styles.cardImage}
-                        />
+                        <View style={styles.iconContainer}>
+                            <Text style={styles.cardIcon}>👨‍🌾</Text>
+                        </View>
                     </TouchableOpacity>
 
                     {/* Regular Card */}
@@ -40,10 +35,9 @@ const RoleSelectionScreen = () => {
                         onPress={() => setSelectedRole('Regular')}
                     >
                         <Text style={[styles.cardTitle, selectedRole === 'Regular' && styles.selectedCardTitle]}>Regular</Text>
-                        <Image
-                            source={{ uri: 'https://picsum.photos/150/150?random=3' }}
-                            style={styles.cardImage}
-                        />
+                        <View style={styles.iconContainer}>
+                            <Text style={styles.cardIcon}>👤</Text>
+                        </View>
                     </TouchableOpacity>
                 </View>
 
@@ -126,11 +120,16 @@ const styles = StyleSheet.create({
     selectedCardTitle: {
         color: '#228B22',
     },
-    cardImage: {
+    iconContainer: {
         width: 80,
         height: 80,
         borderRadius: 40,
         backgroundColor: '#E0E0E0',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    cardIcon: {
+        fontSize: 50,
     },
     description: {
         textAlign: 'center',
