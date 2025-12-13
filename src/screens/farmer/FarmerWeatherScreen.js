@@ -120,6 +120,10 @@ const FarmerWeatherScreen = ({ onNavigateBack }) => {
 
             const currentData = await currentResponse.json();
             
+            // Static sunrise and sunset times
+            const sunrise = '06:46';
+            const sunset = '17:09';
+            
             // Fetch 7-day forecast
             const forecastResponse = await fetch(
                 `https://api.weatherbit.io/v2.0/forecast/daily?lat=${lat}&lon=${lon}&key=${WEATHERBIT_API_KEY}&days=7`
@@ -141,8 +145,8 @@ const FarmerWeatherScreen = ({ onNavigateBack }) => {
                     windSpeed: weather.wind_spd,
                     precipitation: weather.precip || 0,
                     soilTemp: Math.round(weather.temp + 6),
-                    sunrise: forecast[0]?.sunrise || '6:00 am',
-                    sunset: forecast[0]?.sunset || '6:00 pm',
+                    sunrise: sunrise,
+                    sunset: sunset,
                     feelsLike: Math.round(weather.app_temp || weather.temp),
                     pressure: weather.pres || 0,
                     uvIndex: weather.uv || 0,

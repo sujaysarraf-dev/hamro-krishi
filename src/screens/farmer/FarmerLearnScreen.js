@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, BackHandler, Modal, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, BackHandler, Modal, Image, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
-import { Video, ResizeMode } from 'expo-av';
+import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const FarmerLearnScreen = ({ onNavigateBack }) => {
     const router = useRouter();
@@ -25,8 +27,28 @@ const FarmerLearnScreen = ({ onNavigateBack }) => {
         return () => backHandler.remove();
     }, [onNavigateBack, router]);
 
+    useEffect(() => {
+        // Reset video state when modal opens
+        if (showCropModal && selectedCrop?.hasVideo) {
+            setVideoError(false);
+            setVideoLoading(true);
+        }
+        
+        // Cleanup video when modal closes
+        return () => {
+            if (!showCropModal && videoRef.current) {
+                videoRef.current.unloadAsync().catch(() => {});
+            }
+        };
+    }, [showCropModal, selectedCrop]);
+
     const videoRef = useRef(null);
     const [videoStatus, setVideoStatus] = useState({});
+    const [videoError, setVideoError] = useState(false);
+    const [videoLoading, setVideoLoading] = useState(true);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [showControls, setShowControls] = useState(true);
 
     const crops = [
         {
@@ -295,6 +317,70 @@ const FarmerLearnScreen = ({ onNavigateBack }) => {
     const handleCropPress = (crop) => {
         setSelectedCrop(crop);
         setShowCropModal(true);
+        setVideoError(false);
+        setVideoLoading(true);
+    };
+
+    const handleVideoLoad = () => {
+        setVideoLoading(false);
+        setVideoError(false);
+    };
+
+    const handleVideoError = (error) => {
+        console.error('Video error:', error);
+        setVideoError(true);
+        setVideoLoading(false);
+    };
+
+    const togglePlayPause = async () => {
+        try {
+            if (videoRef.current) {
+                const status = await videoRef.current.getStatusAsync();
+                if (status.isPlaying) {
+                    await videoRef.current.pauseAsync();
+                    setIsPlaying(false);
+                } else {
+                    await videoRef.current.playAsync();
+                    setIsPlaying(true);
+                }
+            }
+        } catch (error) {
+            console.error('Error toggling play/pause:', error);
+        }
+    };
+
+    const toggleFullscreen = async () => {
+        try {
+            if (videoRef.current) {
+                if (isFullscreen) {
+                    await videoRef.current.dismissFullscreenPlayer();
+                    setIsFullscreen(false);
+                } else {
+                    await videoRef.current.presentFullscreenPlayer();
+                    setIsFullscreen(true);
+                }
+            }
+        } catch (error) {
+            console.error('Error toggling fullscreen:', error);
+        }
+    };
+
+    const formatTime = (milliseconds) => {
+        if (!milliseconds) return '0:00';
+        const totalSeconds = Math.floor(milliseconds / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    };
+
+    const seekVideo = async (position) => {
+        try {
+            if (videoRef.current) {
+                await videoRef.current.setPositionAsync(position);
+            }
+        } catch (error) {
+            console.error('Error seeking video:', error);
+        }
     };
 
     const dynamicStyles = getStyles(colors, isDark);
@@ -374,17 +460,126 @@ const FarmerLearnScreen = ({ onNavigateBack }) => {
                             {/* Video Section - Only for Rice */}
                             {selectedCrop?.hasVideo && selectedCrop?.videoPath && (
                                 <View style={[dynamicStyles.videoSection, { backgroundColor: colors.surface }]}>
-                                    <Text style={[dynamicStyles.sectionLabel, { color: colors.text }]}>📹 Video Guide</Text>
+                                    <View style={dynamicStyles.videoHeader}>
+                                        <Text style={[dynamicStyles.sectionLabel, { color: colors.text }]}>📹 Video Guide</Text>
+                                        <TouchableOpacity
+                                            onPress={toggleFullscreen}
+                                            style={[dynamicStyles.fullscreenButton, { backgroundColor: colors.primary + '20' }]}
+                                        >
+                                            <Text style={[dynamicStyles.fullscreenButtonText, { color: colors.primary }]}>
+                                                ⛶
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
                                     <View style={dynamicStyles.videoContainer}>
-                                        <Video
-                                            ref={videoRef}
-                                            style={dynamicStyles.video}
-                                            source={selectedCrop.videoPath}
-                                            useNativeControls
-                                            resizeMode={ResizeMode.CONTAIN}
-                                            isLooping={false}
-                                            onPlaybackStatusUpdate={setVideoStatus}
-                                        />
+                                        {videoLoading && (
+                                            <View style={dynamicStyles.videoLoadingContainer}>
+                                                <ActivityIndicator size="large" color={colors.primary} />
+                                                <Text style={[dynamicStyles.videoLoadingText, { color: colors.textSecondary }]}>
+                                                    Loading video...
+                                                </Text>
+                                            </View>
+                                        )}
+                                        {videoError ? (
+                                            <View style={dynamicStyles.videoErrorContainer}>
+                                                <Text style={dynamicStyles.videoErrorIcon}>⚠️</Text>
+                                                <Text style={[dynamicStyles.videoErrorText, { color: colors.textSecondary }]}>
+                                                    Unable to load video
+                                                </Text>
+                                                <TouchableOpacity
+                                                    onPress={() => {
+                                                        setVideoError(false);
+                                                        setVideoLoading(true);
+                                                        if (videoRef.current) {
+                                                            videoRef.current.reloadAsync();
+                                                        }
+                                                    }}
+                                                    style={[dynamicStyles.retryButton, { backgroundColor: colors.primary }]}
+                                                >
+                                                    <Text style={dynamicStyles.retryButtonText}>Retry</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        ) : (
+                                            <View style={dynamicStyles.videoWrapper}>
+                                                <Video
+                                                    ref={videoRef}
+                                                    style={dynamicStyles.video}
+                                                    source={selectedCrop.videoPath}
+                                                    useNativeControls={true}
+                                                    resizeMode={ResizeMode.CONTAIN}
+                                                    isLooping={false}
+                                                    shouldPlay={isPlaying}
+                                                    isMuted={false}
+                                                    volume={1.0}
+                                                    onLoad={handleVideoLoad}
+                                                    onError={handleVideoError}
+                                                    onPlaybackStatusUpdate={(status) => {
+                                                        setVideoStatus(status);
+                                                        setIsPlaying(status.isPlaying || false);
+                                                        if (status.didJustFinish) {
+                                                            setVideoLoading(false);
+                                                            setIsPlaying(false);
+                                                        }
+                                                    }}
+                                                    onLoadStart={() => setVideoLoading(true)}
+                                                    onReadyForDisplay={() => setVideoLoading(false)}
+                                                    onFullscreenUpdate={(event) => {
+                                                        if (event.fullscreenUpdate === 1) {
+                                                            setIsFullscreen(true);
+                                                        } else if (event.fullscreenUpdate === 3) {
+                                                            setIsFullscreen(false);
+                                                        }
+                                                    }}
+                                                />
+                                                {/* Custom Controls Overlay */}
+                                                {showControls && !videoLoading && !videoError && (
+                                                    <View style={dynamicStyles.customControlsOverlay} pointerEvents="box-none">
+                                                        <TouchableOpacity
+                                                            style={dynamicStyles.controlButton}
+                                                            onPress={togglePlayPause}
+                                                        >
+                                                            <Text style={dynamicStyles.controlIcon}>
+                                                                {isPlaying ? '⏸' : '▶'}
+                                                            </Text>
+                                                        </TouchableOpacity>
+                                                        {videoStatus.positionMillis !== undefined && videoStatus.durationMillis !== undefined && (
+                                                            <View style={dynamicStyles.progressContainer}>
+                                                                <Text style={[dynamicStyles.timeText, { color: '#FFFFFF' }]}>
+                                                                    {formatTime(videoStatus.positionMillis)}
+                                                                </Text>
+                                                                <View style={[dynamicStyles.progressBar, { backgroundColor: 'rgba(255, 255, 255, 0.3)' }]}>
+                                                                    <View
+                                                                        style={[
+                                                                            dynamicStyles.progressFill,
+                                                                            {
+                                                                                width: `${(videoStatus.positionMillis / videoStatus.durationMillis) * 100}%`,
+                                                                                backgroundColor: '#FFFFFF',
+                                                                            }
+                                                                        ]}
+                                                                    />
+                                                                </View>
+                                                                <Text style={[dynamicStyles.timeText, { color: '#FFFFFF' }]}>
+                                                                    {formatTime(videoStatus.durationMillis)}
+                                                                </Text>
+                                                            </View>
+                                                        )}
+                                                        <TouchableOpacity
+                                                            style={dynamicStyles.controlButton}
+                                                            onPress={toggleFullscreen}
+                                                        >
+                                                            <Text style={dynamicStyles.controlIcon}>⛶</Text>
+                                                        </TouchableOpacity>
+                                                    </View>
+                                                )}
+                                                {!isPlaying && !videoLoading && !videoError && (
+                                                    <View style={dynamicStyles.playButtonOverlay} pointerEvents="none">
+                                                        <View style={dynamicStyles.playButton}>
+                                                            <Text style={dynamicStyles.playButtonIcon}>▶</Text>
+                                                        </View>
+                                                    </View>
+                                                )}
+                                            </View>
+                                        )}
                                     </View>
                                 </View>
                             )}
@@ -597,19 +792,166 @@ const getStyles = (colors, isDark) => StyleSheet.create({
         padding: 16,
         marginBottom: 16,
     },
+    videoHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
     sectionLabel: {
         fontSize: 18,
         fontWeight: '700',
-        marginBottom: 12,
+    },
+    fullscreenButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    fullscreenButtonText: {
+        fontSize: 18,
+        fontWeight: '600',
     },
     videoContainer: {
         borderRadius: 12,
-        overflow: 'hidden',
+        overflow: 'visible',
         backgroundColor: '#000',
+        width: '100%',
+        height: 250,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    videoWrapper: {
+        width: '100%',
+        minHeight: 200,
+        position: 'relative',
+        backgroundColor: '#000',
+        borderRadius: 12,
+        overflow: 'hidden',
     },
     video: {
         width: '100%',
-        height: 200,
+        height: undefined,
+        aspectRatio: 16 / 9,
+        backgroundColor: '#000',
+    },
+    playButtonOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.3)',
+        borderRadius: 12,
+    },
+    playButton: {
+        width: 70,
+        height: 70,
+        borderRadius: 35,
+        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 5,
+    },
+    playButtonIcon: {
+        fontSize: 30,
+        color: '#000',
+        marginLeft: 4,
+    },
+    customControlsOverlay: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        borderBottomLeftRadius: 12,
+        borderBottomRightRadius: 12,
+    },
+    controlButton: {
+        width: 40,
+        height: 40,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginHorizontal: 8,
+    },
+    controlIcon: {
+        fontSize: 24,
+        color: '#FFFFFF',
+    },
+    progressContainer: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginHorizontal: 8,
+    },
+    progressBar: {
+        flex: 1,
+        height: 4,
+        borderRadius: 2,
+        marginHorizontal: 8,
+        overflow: 'hidden',
+    },
+    progressFill: {
+        height: '100%',
+        borderRadius: 2,
+    },
+    timeText: {
+        fontSize: 12,
+        fontWeight: '600',
+        minWidth: 40,
+        textAlign: 'center',
+    },
+    videoLoadingContainer: {
+        position: 'absolute',
+        width: '100%',
+        height: '100%',
+        minHeight: 200,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#000',
+        zIndex: 1,
+    },
+    videoLoadingText: {
+        marginTop: 12,
+        fontSize: 14,
+    },
+    videoErrorContainer: {
+        width: '100%',
+        minHeight: 200,
+        aspectRatio: 16 / 9,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#000',
+        padding: 20,
+    },
+    videoErrorIcon: {
+        fontSize: 48,
+        marginBottom: 12,
+    },
+    videoErrorText: {
+        fontSize: 14,
+        marginBottom: 16,
+        textAlign: 'center',
+    },
+    retryButton: {
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 8,
+    },
+    retryButtonText: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: '600',
     },
     factsSection: {
         borderRadius: 12,

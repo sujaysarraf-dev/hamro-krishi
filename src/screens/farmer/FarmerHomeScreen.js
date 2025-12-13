@@ -172,22 +172,24 @@ const FarmerHomeScreen = ({ onNavigateToWeather, onNavigateToCalendar, onNavigat
 
             const currentData = await currentResponse.json();
             
-            // Fetch daily forecast for sunrise/sunset
-            let sunrise = '6:00 am';
-            let sunset = '6:00 pm';
+            // Static sunrise and sunset times
+            const sunrise = '06:46';
+            const sunset = '17:09';
+            
+            // Fetch 7-day forecast
+            let forecast = [];
             try {
                 const forecastResponse = await fetch(
-                    `https://api.weatherbit.io/v2.0/forecast/daily?lat=${lat}&lon=${lon}&key=${WEATHERBIT_API_KEY}&days=1`
+                    `https://api.weatherbit.io/v2.0/forecast/daily?lat=${lat}&lon=${lon}&key=${WEATHERBIT_API_KEY}&days=7`
                 );
                 if (forecastResponse.ok) {
                     const forecastData = await forecastResponse.json();
                     if (forecastData.data && forecastData.data.length > 0) {
-                        sunrise = forecastData.data[0].sunrise || sunrise;
-                        sunset = forecastData.data[0].sunset || sunset;
+                        forecast = forecastData.data;
                     }
                 }
             } catch (forecastError) {
-                console.log('Could not fetch sunrise/sunset:', forecastError);
+                console.log('Could not fetch forecast:', forecastError);
             }
             
             if (currentData.data && currentData.data.length > 0) {
@@ -225,7 +227,7 @@ const FarmerHomeScreen = ({ onNavigateToWeather, onNavigateToCalendar, onNavigat
             }
         } catch (error) {
             console.error('Error fetching weather data:', error);
-            // Set default values on error
+            // Set default values on error with static sunrise/sunset
             setWeatherData({
                 temperature: 16,
                 description: 'Clear sky',
@@ -233,8 +235,8 @@ const FarmerHomeScreen = ({ onNavigateToWeather, onNavigateToCalendar, onNavigat
                 windSpeed: 6,
                 precipitation: 0,
                 soilTemp: 22,
-                sunrise: '5:25 am',
-                sunset: '8:04 pm',
+                sunrise: '06:46',
+                sunset: '17:09',
             });
         } finally {
             setWeatherLoading(false);
@@ -268,6 +270,90 @@ const FarmerHomeScreen = ({ onNavigateToWeather, onNavigateToCalendar, onNavigat
             return `${displayHour}:${minutes} ${ampm}`;
         } catch (e) {
             return timeString;
+        }
+    };
+
+    const parse12HourTime = (timeString) => {
+        const match = timeString.match(/(\d+):(\d+)\s*(am|pm)/i);
+        if (!match) return [6, 0];
+        let hour = parseInt(match[1]);
+        const minute = parseInt(match[2]);
+        const period = match[3].toLowerCase();
+        
+        if (period === 'pm' && hour !== 12) hour += 12;
+        if (period === 'am' && hour === 12) hour = 0;
+        
+        return [hour, minute];
+    };
+
+    const calculateDayLength = (sunrise, sunset) => {
+        try {
+            // Parse sunrise time
+            let sunriseHour, sunriseMinute;
+            if (sunrise.includes('am') || sunrise.includes('pm')) {
+                [sunriseHour, sunriseMinute] = parse12HourTime(sunrise);
+            } else {
+                [sunriseHour, sunriseMinute] = sunrise.split(':').map(Number);
+            }
+            const sunriseTime = sunriseHour + (sunriseMinute || 0) / 60;
+
+            // Parse sunset time
+            let sunsetHour, sunsetMinute;
+            if (sunset.includes('am') || sunset.includes('pm')) {
+                [sunsetHour, sunsetMinute] = parse12HourTime(sunset);
+            } else {
+                [sunsetHour, sunsetMinute] = sunset.split(':').map(Number);
+            }
+            const sunsetTime = sunsetHour + (sunsetMinute || 0) / 60;
+
+            // Calculate day length in hours and minutes
+            const totalMinutes = (sunsetTime - sunriseTime) * 60;
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = Math.round(totalMinutes % 60);
+
+            return `${hours}h ${minutes}m`;
+        } catch (e) {
+            return '10h 23m';
+        }
+    };
+
+    const calculateSunPosition = (sunrise, sunset) => {
+        try {
+            const now = new Date();
+            const currentHour = now.getHours();
+            const currentMinute = now.getMinutes();
+            const currentTime = currentHour + currentMinute / 60;
+
+            // Parse sunrise time
+            let sunriseHour, sunriseMinute;
+            if (sunrise.includes('am') || sunrise.includes('pm')) {
+                [sunriseHour, sunriseMinute] = parse12HourTime(sunrise);
+            } else {
+                [sunriseHour, sunriseMinute] = sunrise.split(':').map(Number);
+            }
+            const sunriseTime = sunriseHour + (sunriseMinute || 0) / 60;
+
+            // Parse sunset time
+            let sunsetHour, sunsetMinute;
+            if (sunset.includes('am') || sunset.includes('pm')) {
+                [sunsetHour, sunsetMinute] = parse12HourTime(sunset);
+            } else {
+                [sunsetHour, sunsetMinute] = sunset.split(':').map(Number);
+            }
+            const sunsetTime = sunsetHour + (sunsetMinute || 0) / 60;
+
+            // Calculate position (0% = sunrise, 100% = sunset)
+            if (currentTime < sunriseTime) {
+                return 0; // Before sunrise
+            } else if (currentTime > sunsetTime) {
+                return 100; // After sunset
+            } else {
+                const totalDaylight = sunsetTime - sunriseTime;
+                const elapsed = currentTime - sunriseTime;
+                return Math.min(100, Math.max(0, (elapsed / totalDaylight) * 100));
+            }
+        } catch (e) {
+            return 50; // Default to middle if calculation fails
         }
     };
 
@@ -389,20 +475,50 @@ const FarmerHomeScreen = ({ onNavigateToWeather, onNavigateToCalendar, onNavigat
                                 {/* Sunrise/Sunset */}
                                 <View style={dynamicStyles.sunriseSunsetContainer}>
                                     <View style={dynamicStyles.sunTimeContainer}>
-                                        <Text style={[dynamicStyles.sunTimeLabel, { color: colors.textSecondary }]}>Sunrise</Text>
+                                        <View style={dynamicStyles.sunTimeHeader}>
+                                            <Text style={dynamicStyles.sunriseIcon}>🌅</Text>
+                                            <Text style={[dynamicStyles.sunTimeLabel, { color: colors.textSecondary }]}>Sunrise</Text>
+                                        </View>
                                         <Text style={[dynamicStyles.sunTime, { color: colors.text }]}>
-                                            {weatherData ? formatTime(weatherData.sunrise) : '5:25 am'}
+                                            {weatherData ? formatTime(weatherData.sunrise) : '6:46 am'}
                                         </Text>
                                     </View>
                                     <View style={dynamicStyles.sunArcContainer}>
                                         <View style={[dynamicStyles.sunArc, { borderColor: colors.border }]}>
-                                            <Text style={dynamicStyles.sunIcon}>☀️</Text>
+                                            {(() => {
+                                                const sunPosition = calculateSunPosition(
+                                                    weatherData?.sunrise || '06:46',
+                                                    weatherData?.sunset || '17:09'
+                                                );
+                                                return (
+                                                    <View style={[
+                                                        dynamicStyles.sunPosition,
+                                                        { left: `${sunPosition}%` }
+                                                    ]}>
+                                                        <Text style={dynamicStyles.sunIcon}>☀️</Text>
+                                                    </View>
+                                                );
+                                            })()}
+                                        </View>
+                                        <View style={dynamicStyles.dayLengthContainer}>
+                                            <Text style={[dynamicStyles.dayLengthText, { color: colors.textSecondary }]}>
+                                                {(() => {
+                                                    const dayLength = calculateDayLength(
+                                                        weatherData?.sunrise || '06:46',
+                                                        weatherData?.sunset || '17:09'
+                                                    );
+                                                    return dayLength;
+                                                })()}
+                                            </Text>
                                         </View>
                                     </View>
                                     <View style={dynamicStyles.sunTimeContainer}>
-                                        <Text style={[dynamicStyles.sunTimeLabel, { color: colors.textSecondary }]}>Sunset</Text>
+                                        <View style={dynamicStyles.sunTimeHeader}>
+                                            <Text style={dynamicStyles.sunsetIcon}>🌇</Text>
+                                            <Text style={[dynamicStyles.sunTimeLabel, { color: colors.textSecondary }]}>Sunset</Text>
+                                        </View>
                                         <Text style={[dynamicStyles.sunTime, { color: colors.text }]}>
-                                            {weatherData ? formatTime(weatherData.sunset) : '8:04 pm'}
+                                            {weatherData ? formatTime(weatherData.sunset) : '5:09 pm'}
                                         </Text>
                                     </View>
                                 </View>
@@ -838,11 +954,24 @@ const getStyles = (colors, isDark) => StyleSheet.create({
     },
     sunTimeContainer: {
         alignItems: 'center',
+        flex: 1,
+    },
+    sunTimeHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
+    sunriseIcon: {
+        fontSize: 16,
+        marginRight: 4,
+    },
+    sunsetIcon: {
+        fontSize: 16,
+        marginRight: 4,
     },
     sunTimeLabel: {
         fontSize: 11,
         color: colors.textSecondary,
-        marginBottom: 4,
     },
     sunTime: {
         fontSize: 14,
@@ -850,12 +979,23 @@ const getStyles = (colors, isDark) => StyleSheet.create({
         color: colors.text,
     },
     sunArcContainer: {
-        flex: 1,
+        flex: 1.5,
         alignItems: 'center',
         paddingHorizontal: 20,
+        position: 'relative',
+        height: 60,
+        justifyContent: 'flex-end',
+    },
+    dayLengthContainer: {
+        marginTop: 8,
+        alignItems: 'center',
+    },
+    dayLengthText: {
+        fontSize: 11,
+        fontWeight: '600',
     },
     sunArc: {
-        width: 80,
+        width: '100%',
         height: 40,
         borderTopWidth: 2,
         borderLeftWidth: 2,
@@ -863,8 +1003,19 @@ const getStyles = (colors, isDark) => StyleSheet.create({
         borderTopLeftRadius: 40,
         borderTopRightRadius: 40,
         borderColor: colors.border,
-        justifyContent: 'center',
+        position: 'relative',
+        overflow: 'visible',
+    },
+    sunPosition: {
+        position: 'absolute',
+        bottom: -8,
+        width: 24,
+        height: 24,
         alignItems: 'center',
+        justifyContent: 'center',
+    },
+    sunIcon: {
+        fontSize: 24,
         paddingTop: 8,
     },
     sunIcon: {
