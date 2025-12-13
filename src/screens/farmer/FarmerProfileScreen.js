@@ -289,6 +289,15 @@ const FarmerProfileScreen = () => {
 
                         <TouchableOpacity 
                             style={[dynamicStyles.menuItem, { borderBottomColor: colors.border }]}
+                            onPress={() => router.push('/donate-crops')}
+                        >
+                            <Text style={dynamicStyles.menuIcon}>❤️</Text>
+                            <Text style={[dynamicStyles.menuText, { color: colors.text }]}>Donate Crops</Text>
+                            <Text style={[dynamicStyles.menuArrow, { color: colors.textSecondary }]}>›</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            style={[dynamicStyles.menuItem, { borderBottomColor: colors.border }]}
                             onPress={() => router.push('/settings')}
                         >
                             <Text style={dynamicStyles.menuIcon}>⚙️</Text>
