@@ -10,10 +10,12 @@ import FarmerProfileScreen from './FarmerProfileScreen';
 import FarmerWeatherScreen from './FarmerWeatherScreen';
 import FarmerCropCalendarScreen from './FarmerCropCalendarScreen';
 import FarmerLearnScreen from './FarmerLearnScreen';
+import FarmingChatbot from '../../components/FarmingChatbot';
 
 const FarmerDashboardScreen = () => {
     const { colors, isDark } = useTheme();
     const [activeTab, setActiveTab] = useState('home');
+    const [showChatbot, setShowChatbot] = useState(false);
 
     useEffect(() => {
         const backAction = () => {
@@ -101,6 +103,22 @@ const FarmerDashboardScreen = () => {
             <View style={dynamicStyles.content}>
                 {renderScreen()}
             </View>
+            
+            {/* Floating Chatbot Button */}
+            <TouchableOpacity
+                style={[dynamicStyles.chatbotButton, { backgroundColor: colors.primary }]}
+                onPress={() => setShowChatbot(true)}
+                activeOpacity={0.8}
+            >
+                <Text style={dynamicStyles.chatbotIcon}>🤖</Text>
+            </TouchableOpacity>
+
+            {/* Chatbot Modal */}
+            <FarmingChatbot 
+                visible={showChatbot} 
+                onClose={() => setShowChatbot(false)} 
+            />
+
             <View style={[dynamicStyles.bottomNav, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
                 <TouchableOpacity style={dynamicStyles.navItem} onPress={() => setActiveTab('home')}>
                     <View style={dynamicStyles.navIconContainer}>
@@ -189,6 +207,25 @@ const getStyles = (colors, isDark) => StyleSheet.create({
         fontSize: 12,
         color: colors.textSecondary,
         fontWeight: '500',
+    },
+    chatbotButton: {
+        position: 'absolute',
+        bottom: 90,
+        right: 20,
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        zIndex: 1000,
+    },
+    chatbotIcon: {
+        fontSize: 32,
     },
 });
 
