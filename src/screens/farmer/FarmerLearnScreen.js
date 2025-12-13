@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, BackHandler, Modal, Image, Dimensions, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, BackHandler, Modal, Image, Dimensions, Platform, TextInput, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
+import * as Animatable from 'react-native-animatable';
 
 // Conditionally import expo-video - it may not work on web
 let VideoView = null;
@@ -31,6 +32,11 @@ const FarmerLearnScreen = ({ onNavigateBack }) => {
     const [selectedCrop, setSelectedCrop] = useState(null);
     const [showCropModal, setShowCropModal] = useState(false);
     const [videoSource, setVideoSource] = useState(null);
+    const [expandedTopics, setExpandedTopics] = useState({});
+    const [completedSteps, setCompletedSteps] = useState({});
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('all');
+    const modalScale = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
         const backAction = () => {
@@ -80,6 +86,18 @@ const FarmerLearnScreen = ({ onNavigateBack }) => {
                 videoPlayer.pause();
                 videoPlayer.seekTo(0);
             }
+        }
+        // Initialize modal scale
+        if (showCropModal) {
+            modalScale.setValue(0);
+            Animated.spring(modalScale, {
+                toValue: 1,
+                useNativeDriver: true,
+                tension: 50,
+                friction: 7,
+            }).start();
+        } else {
+            modalScale.setValue(0);
         }
     }, [showCropModal, selectedCrop, videoSource, videoPlayer]);
 
@@ -372,7 +390,66 @@ const FarmerLearnScreen = ({ onNavigateBack }) => {
         setShowCropModal(true);
         setVideoError(false);
         setVideoLoading(true);
+        // Reset expanded topics and completed steps for new crop
+        setExpandedTopics({});
+        setCompletedSteps({});
     };
+
+    const handleCloseModal = () => {
+        Animated.spring(modalScale, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 50,
+            friction: 7,
+        }).start(() => {
+            setShowCropModal(false);
+        });
+    };
+
+    const toggleTopic = (topicIndex) => {
+        setExpandedTopics(prev => ({
+            ...prev,
+            [topicIndex]: !prev[topicIndex]
+        }));
+    };
+
+    const toggleStep = (topicIndex, stepIndex) => {
+        const key = `${topicIndex}-${stepIndex}`;
+        setCompletedSteps(prev => ({
+            ...prev,
+            [key]: !prev[key]
+        }));
+    };
+
+    const getTopicProgress = (topicIndex, steps) => {
+        if (!steps || steps.length === 0) return 0;
+        const completed = steps.filter((_, stepIndex) => completedSteps[`${topicIndex}-${stepIndex}`]).length;
+        return Math.round((completed / steps.length) * 100);
+    };
+
+    const getOverallProgress = () => {
+        if (!selectedCrop?.topics) return 0;
+        let totalSteps = 0;
+        let completed = 0;
+        selectedCrop.topics.forEach((topic, topicIndex) => {
+            if (topic.steps) {
+                totalSteps += topic.steps.length;
+                topic.steps.forEach((_, stepIndex) => {
+                    if (completedSteps[`${topicIndex}-${stepIndex}`]) {
+                        completed++;
+                    }
+                });
+            }
+        });
+        return totalSteps > 0 ? Math.round((completed / totalSteps) * 100) : 0;
+    };
+
+    // Filter crops based on search and category
+    const filteredCrops = crops.filter(crop => {
+        const matchesSearch = crop.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            crop.description.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchesSearch;
+    });
 
     const handleVideoLoad = () => {
         setVideoLoading(false);
@@ -440,23 +517,62 @@ const FarmerLearnScreen = ({ onNavigateBack }) => {
 
             <ScrollView showsVerticalScrollIndicator={false}>
                 <View style={dynamicStyles.content}>
+                    {/* Search Bar */}
+                    <Animatable.View animation="fadeInDown" duration={500} style={dynamicStyles.searchContainer}>
+                        <View style={[dynamicStyles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                            <Text style={[dynamicStyles.searchIcon, { color: colors.textSecondary }]}>🔍</Text>
+                            <TextInput
+                                style={[dynamicStyles.searchInput, { color: colors.text }]}
+                                placeholder="Search crops..."
+                                placeholderTextColor={colors.textSecondary}
+                                value={searchQuery}
+                                onChangeText={setSearchQuery}
+                            />
+                            {searchQuery.length > 0 && (
+                                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                                    <Text style={[dynamicStyles.clearIcon, { color: colors.textSecondary }]}>✕</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                    </Animatable.View>
+
                     <Text style={[dynamicStyles.subtitle, { color: colors.textSecondary }]}>
-                        Select a crop to learn farming techniques
+                        {filteredCrops.length > 0 
+                            ? `Select a crop to learn farming techniques (${filteredCrops.length} available)`
+                            : 'No crops found. Try a different search.'}
                     </Text>
 
                     <View style={dynamicStyles.cropsGrid}>
-                        {crops.map((crop) => (
-                            <TouchableOpacity
+                        {filteredCrops.map((crop, index) => (
+                            <Animatable.View
                                 key={crop.id}
-                                style={[dynamicStyles.cropCard, { backgroundColor: colors.card }]}
-                                onPress={() => handleCropPress(crop)}
+                                animation="fadeInUp"
+                                duration={400}
+                                delay={index * 100}
+                                style={dynamicStyles.cropCardWrapper}
                             >
-                                <Text style={dynamicStyles.cropIcon}>{crop.icon}</Text>
-                                <Text style={[dynamicStyles.cropName, { color: colors.text }]}>{crop.name}</Text>
-                                <Text style={[dynamicStyles.cropDescription, { color: colors.textSecondary }]}>
-                                    {crop.description}
-                                </Text>
-                            </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[dynamicStyles.cropCard, { backgroundColor: colors.card }]}
+                                    onPress={() => handleCropPress(crop)}
+                                    activeOpacity={0.8}
+                                >
+                                    <View style={[dynamicStyles.cropIconContainer, { backgroundColor: colors.primary + '15' }]}>
+                                        <Text style={dynamicStyles.cropIcon}>{crop.icon}</Text>
+                                    </View>
+                                    <Text style={[dynamicStyles.cropName, { color: colors.text }]}>{crop.name}</Text>
+                                    <Text 
+                                        style={[dynamicStyles.cropDescription, { color: colors.textSecondary }]}
+                                        numberOfLines={2}
+                                    >
+                                        {crop.description}
+                                    </Text>
+                                    <View style={dynamicStyles.cropBadge}>
+                                        <Text style={[dynamicStyles.cropBadgeText, { color: colors.primary }]}>
+                                            {crop.topics?.length || 0} Topics
+                                        </Text>
+                                    </View>
+                                </TouchableOpacity>
+                            </Animatable.View>
                         ))}
                     </View>
                 </View>
@@ -465,22 +581,52 @@ const FarmerLearnScreen = ({ onNavigateBack }) => {
             {/* Crop Details Modal */}
             <Modal
                 visible={showCropModal}
-                animationType="slide"
+                animationType="fade"
                 transparent={true}
-                onRequestClose={() => setShowCropModal(false)}
+                onRequestClose={handleCloseModal}
             >
                 <View style={dynamicStyles.modalOverlay}>
-                    <View style={[dynamicStyles.modalContent, { backgroundColor: colors.card }]}>
+                    <Animated.View 
+                        style={[
+                            dynamicStyles.modalContent, 
+                            { 
+                                backgroundColor: colors.card,
+                                transform: [{ scale: modalScale }]
+                            }
+                        ]}
+                    >
                         <View style={dynamicStyles.modalHeader}>
                             <View style={dynamicStyles.modalHeaderLeft}>
-                                <Text style={dynamicStyles.modalCropIcon}>{selectedCrop?.icon}</Text>
-                                <Text style={[dynamicStyles.modalTitle, { color: colors.text }]}>
-                                    {selectedCrop?.name} Farming
-                                </Text>
+                                <View style={[dynamicStyles.modalIconContainer, { backgroundColor: colors.primary + '15' }]}>
+                                    <Text style={dynamicStyles.modalCropIcon}>{selectedCrop?.icon}</Text>
+                                </View>
+                                <View style={dynamicStyles.modalTitleContainer}>
+                                    <Text style={[dynamicStyles.modalTitle, { color: colors.text }]}>
+                                        {selectedCrop?.name} Farming
+                                    </Text>
+                                    {getOverallProgress() > 0 && (
+                                        <View style={dynamicStyles.progressBarContainer}>
+                                            <View style={[dynamicStyles.progressBarBg, { backgroundColor: colors.surface }]}>
+                                                <View 
+                                                    style={[
+                                                        dynamicStyles.progressBarFill, 
+                                                        { 
+                                                            width: `${getOverallProgress()}%`,
+                                                            backgroundColor: colors.primary 
+                                                        }
+                                                    ]} 
+                                                />
+                                            </View>
+                                            <Text style={[dynamicStyles.progressText, { color: colors.textSecondary }]}>
+                                                {getOverallProgress()}% Complete
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
                             </View>
                             <TouchableOpacity 
-                                onPress={() => setShowCropModal(false)}
-                                style={dynamicStyles.closeButton}
+                                onPress={handleCloseModal}
+                                style={[dynamicStyles.closeButton, { backgroundColor: colors.surface }]}
                             >
                                 <Text style={[dynamicStyles.closeButtonText, { color: colors.text }]}>✕</Text>
                             </TouchableOpacity>
@@ -605,35 +751,145 @@ const FarmerLearnScreen = ({ onNavigateBack }) => {
 
                             {/* Topics/Guides Section */}
                             <View style={dynamicStyles.guidesSection}>
-                                <Text style={[dynamicStyles.sectionLabel, { color: colors.text }]}>📖 Farming Guide</Text>
-                                {selectedCrop?.topics.map((topic, index) => (
-                                    <View key={index} style={[dynamicStyles.topicCard, { backgroundColor: colors.surface }]}>
-                                        <Text style={[dynamicStyles.topicTitle, { color: colors.text }]}>
-                                            {index + 1}. {topic.title}
-                                        </Text>
-                                        <Text style={[dynamicStyles.topicContent, { color: colors.textSecondary }]}>
-                                            {topic.content}
-                                        </Text>
-                                        {/* Steps - Only for Rice */}
-                                        {topic.steps && topic.steps.length > 0 && (
-                                            <View style={dynamicStyles.stepsContainer}>
-                                                {topic.steps.map((step, stepIndex) => (
-                                                    <View key={stepIndex} style={[dynamicStyles.stepItem, { borderLeftColor: colors.primary }]}>
-                                                        <Text style={[dynamicStyles.stepNumber, { color: colors.primary }]}>
-                                                            {stepIndex + 1}
-                                                        </Text>
-                                                        <Text style={[dynamicStyles.stepText, { color: colors.textSecondary }]}>
-                                                            {step}
-                                                        </Text>
+                                <View style={dynamicStyles.sectionHeader}>
+                                    <Text style={[dynamicStyles.sectionLabel, { color: colors.text }]}>📖 Farming Guide</Text>
+                                    {getOverallProgress() > 0 && (
+                                        <View style={[dynamicStyles.overallProgressBadge, { backgroundColor: colors.primary + '20' }]}>
+                                            <Text style={[dynamicStyles.overallProgressText, { color: colors.primary }]}>
+                                                {getOverallProgress()}% Complete
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
+                                {selectedCrop?.topics.map((topic, index) => {
+                                    const isExpanded = expandedTopics[index];
+                                    const progress = topic.steps ? getTopicProgress(index, topic.steps) : 0;
+                                    const hasSteps = topic.steps && topic.steps.length > 0;
+                                    
+                                    return (
+                                        <Animatable.View
+                                            key={index}
+                                            animation={isExpanded ? "fadeInDown" : "fadeInUp"}
+                                            duration={300}
+                                        >
+                                            <TouchableOpacity
+                                                style={[
+                                                    dynamicStyles.topicCard, 
+                                                    { 
+                                                        backgroundColor: colors.surface,
+                                                        borderLeftWidth: 4,
+                                                        borderLeftColor: progress === 100 ? '#4CAF50' : colors.primary
+                                                    }
+                                                ]}
+                                                onPress={() => hasSteps && toggleTopic(index)}
+                                                activeOpacity={hasSteps ? 0.7 : 1}
+                                            >
+                                                <View style={dynamicStyles.topicHeader}>
+                                                    <View style={dynamicStyles.topicHeaderLeft}>
+                                                        <View style={[dynamicStyles.topicNumberBadge, { backgroundColor: colors.primary + '20' }]}>
+                                                            <Text style={[dynamicStyles.topicNumber, { color: colors.primary }]}>
+                                                                {index + 1}
+                                                            </Text>
+                                                        </View>
+                                                        <View style={dynamicStyles.topicTitleContainer}>
+                                                            <Text style={[dynamicStyles.topicTitle, { color: colors.text }]}>
+                                                                {topic.title}
+                                                            </Text>
+                                                            {hasSteps && progress > 0 && (
+                                                                <View style={dynamicStyles.topicProgressContainer}>
+                                                                    <View style={[dynamicStyles.topicProgressBar, { backgroundColor: colors.surface }]}>
+                                                                        <View 
+                                                                            style={[
+                                                                                dynamicStyles.topicProgressFill, 
+                                                                                { 
+                                                                                    width: `${progress}%`,
+                                                                                    backgroundColor: progress === 100 ? '#4CAF50' : colors.primary 
+                                                                                }
+                                                                            ]} 
+                                                                        />
+                                                                    </View>
+                                                                    <Text style={[dynamicStyles.topicProgressText, { color: colors.textSecondary }]}>
+                                                                        {progress}%
+                                                                    </Text>
+                                                                </View>
+                                                            )}
+                                                        </View>
                                                     </View>
-                                                ))}
-                                            </View>
-                                        )}
-                                    </View>
-                                ))}
+                                                    {hasSteps && (
+                                                        <TouchableOpacity onPress={() => toggleTopic(index)}>
+                                                            <Text style={[dynamicStyles.expandIcon, { color: colors.primary }]}>
+                                                                {isExpanded ? '▼' : '▶'}
+                                                            </Text>
+                                                        </TouchableOpacity>
+                                                    )}
+                                                </View>
+                                                <Text style={[dynamicStyles.topicContent, { color: colors.textSecondary }]}>
+                                                    {topic.content}
+                                                </Text>
+                                                {/* Expandable Steps */}
+                                                {hasSteps && isExpanded && (
+                                                    <Animatable.View 
+                                                        animation="fadeInDown" 
+                                                        duration={300}
+                                                        style={dynamicStyles.stepsContainer}
+                                                    >
+                                                        <Text style={[dynamicStyles.stepsHeader, { color: colors.text }]}>
+                                                            Step-by-Step Guide:
+                                                        </Text>
+                                                        {topic.steps.map((step, stepIndex) => {
+                                                            const stepKey = `${index}-${stepIndex}`;
+                                                            const isCompleted = completedSteps[stepKey];
+                                                            
+                                                            return (
+                                                                <TouchableOpacity
+                                                                    key={stepIndex}
+                                                                    style={[
+                                                                        dynamicStyles.stepItem, 
+                                                                        { 
+                                                                            borderLeftColor: isCompleted ? '#4CAF50' : colors.primary,
+                                                                            backgroundColor: isCompleted ? colors.primary + '05' : 'transparent'
+                                                                        }
+                                                                    ]}
+                                                                    onPress={() => toggleStep(index, stepIndex)}
+                                                                    activeOpacity={0.7}
+                                                                >
+                                                                    <View style={[
+                                                                        dynamicStyles.stepCheckbox,
+                                                                        { 
+                                                                            backgroundColor: isCompleted ? '#4CAF50' : 'transparent',
+                                                                            borderColor: isCompleted ? '#4CAF50' : colors.primary
+                                                                        }
+                                                                    ]}>
+                                                                        {isCompleted && (
+                                                                            <Text style={dynamicStyles.checkmark}>✓</Text>
+                                                                        )}
+                                                                    </View>
+                                                                    <View style={dynamicStyles.stepContent}>
+                                                                        <Text style={[dynamicStyles.stepNumber, { color: colors.primary }]}>
+                                                                            Step {stepIndex + 1}
+                                                                        </Text>
+                                                                        <Text style={[
+                                                                            dynamicStyles.stepText, 
+                                                                            { 
+                                                                                color: isCompleted ? colors.textSecondary : colors.text,
+                                                                                textDecorationLine: isCompleted ? 'line-through' : 'none'
+                                                                            }
+                                                                        ]}>
+                                                                            {step}
+                                                                        </Text>
+                                                                    </View>
+                                                                </TouchableOpacity>
+                                                            );
+                                                        })}
+                                                    </Animatable.View>
+                                                )}
+                                            </TouchableOpacity>
+                                        </Animatable.View>
+                                    );
+                                })}
                             </View>
                         </ScrollView>
-                    </View>
+                    </Animated.View>
                 </View>
             </Modal>
         </SafeAreaView>
@@ -672,41 +928,95 @@ const getStyles = (colors, isDark) => StyleSheet.create({
     },
     content: {
         padding: 20,
+        paddingBottom: 40,
     },
     subtitle: {
         fontSize: 14,
         marginBottom: 20,
+        marginTop: 8,
         textAlign: 'center',
+    },
+    searchContainer: {
+        marginBottom: 20,
+    },
+    searchBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderWidth: 1,
+    },
+    searchIcon: {
+        fontSize: 20,
+        marginRight: 10,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 16,
+    },
+    clearIcon: {
+        fontSize: 18,
+        padding: 4,
     },
     cropsGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        justifyContent: 'center',
-        alignItems: 'center',
-        gap: 16,
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
     },
-    cropCard: {
+    cropCardWrapper: {
         width: '48%',
-        maxWidth: 180,
-        borderRadius: 16,
-        padding: 20,
-        alignItems: 'center',
         marginBottom: 16,
     },
-    cropIcon: {
-        fontSize: 48,
+    cropCard: {
+        width: '100%',
+        borderRadius: 20,
+        padding: 16,
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        minHeight: 200,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 3,
+    },
+    cropIconContainer: {
+        width: 70,
+        height: 70,
+        borderRadius: 35,
+        justifyContent: 'center',
+        alignItems: 'center',
         marginBottom: 12,
+    },
+    cropIcon: {
+        fontSize: 40,
     },
     cropName: {
         fontSize: 18,
         fontWeight: '700',
-        marginBottom: 8,
+        marginBottom: 6,
         textAlign: 'center',
     },
     cropDescription: {
         fontSize: 12,
         textAlign: 'center',
         lineHeight: 16,
+        marginBottom: 8,
+        flex: 1,
+        minHeight: 32,
+    },
+    cropBadge: {
+        marginTop: 'auto',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 12,
+        backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    },
+    cropBadgeText: {
+        fontSize: 11,
+        fontWeight: '600',
     },
     modalOverlay: {
         flex: 1,
@@ -734,9 +1044,40 @@ const getStyles = (colors, isDark) => StyleSheet.create({
         alignItems: 'center',
         flex: 1,
     },
-    modalCropIcon: {
-        fontSize: 32,
+    modalIconContainer: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        justifyContent: 'center',
+        alignItems: 'center',
         marginRight: 12,
+    },
+    modalCropIcon: {
+        fontSize: 28,
+    },
+    modalTitleContainer: {
+        flex: 1,
+    },
+    progressBarContainer: {
+        marginTop: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    progressBarBg: {
+        flex: 1,
+        height: 6,
+        borderRadius: 3,
+        overflow: 'hidden',
+    },
+    progressBarFill: {
+        height: '100%',
+        borderRadius: 3,
+    },
+    progressText: {
+        fontSize: 11,
+        fontWeight: '600',
+        minWidth: 60,
     },
     modalTitle: {
         fontSize: 24,
@@ -744,10 +1085,9 @@ const getStyles = (colors, isDark) => StyleSheet.create({
         flex: 1,
     },
     closeButton: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: colors.surface,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -761,15 +1101,87 @@ const getStyles = (colors, isDark) => StyleSheet.create({
     modalScrollContent: {
         padding: 20,
     },
-    topicCard: {
+    sectionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    overallProgressBadge: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
         borderRadius: 12,
+    },
+    overallProgressText: {
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    topicCard: {
+        borderRadius: 16,
         padding: 16,
         marginBottom: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    topicHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 12,
+    },
+    topicHeaderLeft: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        flex: 1,
+    },
+    topicNumberBadge: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    topicNumber: {
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    topicTitleContainer: {
+        flex: 1,
     },
     topicTitle: {
         fontSize: 18,
         fontWeight: '700',
-        marginBottom: 12,
+        marginBottom: 6,
+    },
+    topicProgressContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 4,
+    },
+    topicProgressBar: {
+        flex: 1,
+        height: 4,
+        borderRadius: 2,
+        overflow: 'hidden',
+    },
+    topicProgressFill: {
+        height: '100%',
+        borderRadius: 2,
+    },
+    topicProgressText: {
+        fontSize: 10,
+        fontWeight: '600',
+        minWidth: 35,
+    },
+    expandIcon: {
+        fontSize: 16,
+        fontWeight: '700',
+        padding: 4,
     },
     topicContent: {
         fontSize: 14,
@@ -979,22 +1391,46 @@ const getStyles = (colors, isDark) => StyleSheet.create({
         marginTop: 8,
     },
     stepsContainer: {
-        marginTop: 12,
+        marginTop: 16,
+        paddingTop: 16,
+        borderTopWidth: 1,
+        borderTopColor: colors.border,
+    },
+    stepsHeader: {
+        fontSize: 14,
+        fontWeight: '700',
+        marginBottom: 12,
     },
     stepItem: {
         flexDirection: 'row',
-        paddingLeft: 12,
+        padding: 12,
         marginBottom: 10,
         borderLeftWidth: 3,
+        borderRadius: 8,
+    },
+    stepCheckbox: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        borderWidth: 2,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    checkmark: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    stepContent: {
+        flex: 1,
     },
     stepNumber: {
-        fontSize: 16,
+        fontSize: 12,
         fontWeight: '700',
-        marginRight: 12,
-        minWidth: 24,
+        marginBottom: 4,
     },
     stepText: {
-        flex: 1,
         fontSize: 14,
         lineHeight: 20,
     },
