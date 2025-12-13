@@ -17,6 +17,7 @@ const WelcomeScreen = () => {
             </View>
 
             <View style={styles.content}>
+                <Text style={styles.appName}>Hamro Krishi</Text>
                 <Text style={styles.title}>
                     Smart Farming{'\n'}and <Text style={styles.highlight}>Agriculture</Text>{'\n'}App for <Text style={styles.highlight}>Farmers</Text>
                 </Text>
@@ -31,7 +32,7 @@ const WelcomeScreen = () => {
                 {/* Main Illustration */}
                 <View style={styles.imageContainer}>
                     <Image
-                        source={{ uri: 'https://picsum.photos/400/500?random=1' }}
+                        source={require('../../assets/home/home.png')}
                         style={styles.image}
                         resizeMode="contain"
                     />
@@ -59,6 +60,14 @@ const styles = StyleSheet.create({
     content: {
         flex: 1,
         paddingTop: 40,
+    },
+    appName: {
+        fontSize: 36,
+        fontWeight: '800',
+        color: '#10893E',
+        marginBottom: 16,
+        fontFamily: 'System',
+        textAlign: 'left',
     },
     title: {
         fontSize: 32,

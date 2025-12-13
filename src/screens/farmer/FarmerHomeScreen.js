@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Dimensions, ActivityIndicator, Alert, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Dimensions, ActivityIndicator, Alert, Modal, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import { useFocusEffect } from 'expo-router';
@@ -312,11 +312,11 @@ const FarmerHomeScreen = () => {
                         <Text style={dynamicStyles.refreshIcon}>🔄</Text>
                     </TouchableOpacity>
                 </View>
-            </View>
+                </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} style={dynamicStyles.scrollView}>
-                <View style={dynamicStyles.content}>
-                    {/* Search Bar */}
+                <ScrollView showsVerticalScrollIndicator={false} style={dynamicStyles.scrollView}>
+                    <View style={dynamicStyles.content}>
+                        {/* Search Bar */}
                     <View style={[dynamicStyles.searchContainer, { backgroundColor: isDark ? colors.surface : '#E8F5E9' }]}>
                         <Text style={dynamicStyles.searchIcon}>🔍</Text>
                         <TextInput
