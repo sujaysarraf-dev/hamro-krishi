@@ -24,6 +24,10 @@ DROP POLICY IF EXISTS "Public can view images" ON storage.objects;
 DROP POLICY IF EXISTS "Users can upload own images" ON storage.objects;
 DROP POLICY IF EXISTS "Users can update own images" ON storage.objects;
 DROP POLICY IF EXISTS "Users can delete own images" ON storage.objects;
+DROP POLICY IF EXISTS "Farmers can upload product images" ON storage.objects;
+DROP POLICY IF EXISTS "Farmers can update product images" ON storage.objects;
+DROP POLICY IF EXISTS "Farmers can delete product images" ON storage.objects;
+DROP POLICY IF EXISTS "Public can view product images" ON storage.objects;
 
 -- Drop table policies
 DROP POLICY IF EXISTS "Users can view own profile" ON user_profiles;
@@ -311,6 +315,46 @@ TO public
 USING (bucket_id = 'user_images');
 
 -- ============================================
+-- PRODUCT IMAGES STORAGE BUCKET SETUP
+-- ============================================
+
+-- Create the storage bucket for product images (if it doesn't exist)
+-- Note: If bucket creation fails, create it manually in Supabase Dashboard -> Storage
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('product_images', 'product_images', true)
+ON CONFLICT (id) DO UPDATE
+SET public = true;
+
+-- Allow authenticated users (farmers) to upload product images
+CREATE POLICY "Farmers can upload product images"
+ON storage.objects
+FOR INSERT
+TO authenticated
+WITH CHECK (bucket_id = 'product_images');
+
+-- Allow authenticated users (farmers) to update product images
+CREATE POLICY "Farmers can update product images"
+ON storage.objects
+FOR UPDATE
+TO authenticated
+USING (bucket_id = 'product_images')
+WITH CHECK (bucket_id = 'product_images');
+
+-- Allow authenticated users (farmers) to delete product images
+CREATE POLICY "Farmers can delete product images"
+ON storage.objects
+FOR DELETE
+TO authenticated
+USING (bucket_id = 'product_images');
+
+-- Allow public to view product images (since bucket is public)
+CREATE POLICY "Public can view product images"
+ON storage.objects
+FOR SELECT
+TO public
+USING (bucket_id = 'product_images');
+
+-- ============================================
 -- VERIFICATION (Optional - uncomment to verify)
 -- ============================================
 
@@ -323,5 +367,5 @@ USING (bucket_id = 'user_images');
 -- FROM information_schema.columns 
 -- WHERE table_name = 'user_profiles' ORDER BY ordinal_position;
 
--- Verify storage bucket was created
--- SELECT id, name, public FROM storage.buckets WHERE id = 'user_images';
+-- Verify storage buckets were created
+-- SELECT id, name, public FROM storage.buckets WHERE id IN ('user_images', 'product_images');

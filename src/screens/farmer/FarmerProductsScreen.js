@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Dimensions, Modal, ActivityIndicator, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Dimensions, Modal, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../config/supabase';
 import { useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import SweetAlert from '../../components/SweetAlert';
 
 const { width, height } = Dimensions.get('window');
@@ -22,6 +22,7 @@ const FarmerProductsScreen = () => {
     const [uploading, setUploading] = useState(false);
     const [showUnitDropdown, setShowUnitDropdown] = useState(false);
     const [alert, setAlert] = useState({ visible: false, type: 'info', title: '', message: '' });
+    const [deleteAlert, setDeleteAlert] = useState({ visible: false, productId: null, productName: '' });
 
     // Form state
     const [formData, setFormData] = useState({
@@ -126,13 +127,17 @@ const FarmerProductsScreen = () => {
             }
 
             const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ['images'],
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
                 allowsEditing: true,
                 aspect: [1, 1],
                 quality: 0.8,
             });
 
             if (!result.canceled && result.assets && result.assets[0]) {
+                console.log('Image picked:', result.assets[0].uri);
+                console.log('Image type:', result.assets[0].type);
+                console.log('Image width:', result.assets[0].width);
+                console.log('Image height:', result.assets[0].height);
                 setLocalImage(result.assets[0].uri);
             }
         } catch (error) {
@@ -152,35 +157,81 @@ const FarmerProductsScreen = () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error('User not authenticated');
 
-            const fileExt = imageUri.split('.').pop()?.toLowerCase() || 'jpg';
+            console.log('Starting image upload for product:', productId);
+            console.log('Image URI:', imageUri);
+
+            // Determine file extension from URI or default to jpg
+            let fileExt = 'jpg';
+            if (imageUri.includes('.')) {
+                const uriParts = imageUri.split('.');
+                fileExt = uriParts[uriParts.length - 1].toLowerCase().split('?')[0];
+            }
+            // Handle common image extensions
+            if (!['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExt)) {
+                fileExt = 'jpg';
+            }
+
             const fileName = `product-${productId || Date.now()}-${Date.now()}.${fileExt}`;
             const filePath = `products/${fileName}`;
 
-            const base64 = await FileSystem.readAsStringAsync(imageUri, {
-                encoding: FileSystem.EncodingType.Base64,
-            });
-
-            const byteCharacters = atob(base64);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            console.log('Reading file from URI:', imageUri);
+            
+            // Check if URI is a URL (not a local file) - this shouldn't happen but just in case
+            if (imageUri.startsWith('http://') || imageUri.startsWith('https://')) {
+                throw new Error('Cannot upload image from URL. Please select a local image file.');
             }
-            const byteArray = new Uint8Array(byteNumbers);
+            
+            // For React Native, read file as base64 and convert to ArrayBuffer
+            // This is more reliable than fetch for local files
+            let base64;
+            try {
+                base64 = await FileSystem.readAsStringAsync(imageUri, {
+                    encoding: FileSystem.EncodingType.Base64,
+                });
+                console.log('File read successfully, base64 length:', base64.length);
+            } catch (readError) {
+                console.error('Error reading file:', readError);
+                console.error('URI that failed:', imageUri);
+                throw new Error(`Failed to read image file. Error: ${readError.message}. Please try selecting the image again.`);
+            }
+            
+            // Convert base64 to ArrayBuffer (Uint8Array)
+            let byteArray;
+            try {
+                const byteCharacters = atob(base64);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                byteArray = new Uint8Array(byteNumbers);
+                console.log('Converted to Uint8Array, size:', byteArray.length, 'bytes');
+            } catch (convertError) {
+                console.error('Error converting base64:', convertError);
+                throw new Error('Failed to process image data. Please try selecting the image again.');
+            }
 
+            console.log('File read, size:', byteArray.length, 'bytes');
+            console.log('Uploading to path:', filePath);
+
+            // Upload to Supabase storage
             const { data, error: uploadError } = await supabase.storage
-                .from('user_images')
+                .from('product_images')
                 .upload(filePath, byteArray, {
                     contentType: `image/${fileExt}`,
                     upsert: true,
                     cacheControl: '3600',
                 });
 
-            if (uploadError) throw uploadError;
+            if (uploadError) {
+                console.error('Upload error:', uploadError);
+                throw uploadError;
+            }
 
             const { data: { publicUrl } } = supabase.storage
-                .from('user_images')
+                .from('product_images')
                 .getPublicUrl(filePath);
 
+            console.log('Upload successful, URL:', publicUrl);
             return publicUrl;
         } catch (error) {
             console.error('Error uploading image:', error);
@@ -220,8 +271,8 @@ const FarmerProductsScreen = () => {
             };
 
             if (editingProduct) {
-                // Upload image if a new one was selected
-                if (localImage && localImage !== formData.imageUrl) {
+                // Upload image if a new one was selected (check if it's a local file, not a URL)
+                if (localImage && localImage !== formData.imageUrl && (localImage.startsWith('file://') || localImage.startsWith('data:image') || localImage.startsWith('content://'))) {
                     const imageUrl = await uploadImage(localImage, editingProduct.id);
                     productData.image_url = imageUrl;
                 } else {
@@ -258,7 +309,8 @@ const FarmerProductsScreen = () => {
                 if (insertError) throw insertError;
 
                 // If image was uploaded, update the product with the image URL
-                if (localImage && localImage !== formData.imageUrl) {
+                // Only upload if it's a local file (not a URL)
+                if (localImage && (localImage.startsWith('file://') || localImage.startsWith('data:image') || localImage.startsWith('content://'))) {
                     const uploadedImageUrl = await uploadImage(localImage, newProduct.id);
                     const { error: updateError } = await supabase
                         .from('products')
@@ -399,7 +451,7 @@ const FarmerProductsScreen = () => {
                                             <View style={dynamicStyles.productDetails}>
                                                 <Text style={[dynamicStyles.productName, { color: colors.text }]}>{product.name}</Text>
                                                 <Text style={[dynamicStyles.productPrice, { color: colors.primary }]}>
-                                                    NPR {formatPrice(product.price)}
+                                                    NPR {formatPrice(product.price)} / {product.stock_unit || 'kilograms'}
                                                 </Text>
                                                 <Text style={[dynamicStyles.productStock, { color: colors.textSecondary }]}>
                                                     Stock: {product.stock_quantity} {product.stock_unit}
@@ -426,18 +478,11 @@ const FarmerProductsScreen = () => {
                                                         <TouchableOpacity 
                                                             style={dynamicStyles.deleteButton}
                                                             onPress={() => {
-                                                                Alert.alert(
-                                                                    'Delete Product',
-                                                                    `Are you sure you want to delete ${product.name}?`,
-                                                                    [
-                                                                        { text: 'Cancel', style: 'cancel' },
-                                                                        { 
-                                                                            text: 'Delete', 
-                                                                            style: 'destructive',
-                                                                            onPress: () => handleDeleteProduct(product.id)
-                                                                        },
-                                                                    ]
-                                                                );
+                                                                setDeleteAlert({
+                                                                    visible: true,
+                                                                    productId: product.id,
+                                                                    productName: product.name,
+                                                                });
                                                             }}
                                                         >
                                                             <Text style={[dynamicStyles.deleteButtonText, { color: colors.error }]}>Delete</Text>
@@ -678,6 +723,26 @@ const FarmerProductsScreen = () => {
                 onConfirm={() => {
                     setAlert({ ...alert, visible: false });
                     if (alert.onConfirm) alert.onConfirm();
+                }}
+            />
+
+            {/* Delete Confirmation SweetAlert */}
+            <SweetAlert
+                visible={deleteAlert.visible}
+                type="warning"
+                title="Delete Product"
+                message={`Are you sure you want to delete "${deleteAlert.productName}"? This action cannot be undone.`}
+                confirmText="Delete"
+                cancelText="Cancel"
+                showCancel={true}
+                onConfirm={() => {
+                    setDeleteAlert({ ...deleteAlert, visible: false });
+                    if (deleteAlert.productId) {
+                        handleDeleteProduct(deleteAlert.productId);
+                    }
+                }}
+                onCancel={() => {
+                    setDeleteAlert({ ...deleteAlert, visible: false });
                 }}
             />
         </SafeAreaView>
