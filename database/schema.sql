@@ -117,6 +117,7 @@ CREATE TABLE products (
     stock_quantity DECIMAL(10, 2) NOT NULL DEFAULT 0,
     stock_unit TEXT NOT NULL DEFAULT 'kilograms',
     status TEXT NOT NULL DEFAULT 'Active' CHECK (status IN ('Active', 'Inactive')),
+    category TEXT NOT NULL DEFAULT 'grain' CHECK (category IN ('grain', 'vegetable', 'fruit', 'livestock', 'cash crop', 'spice and herb', 'fish')),
     image_url TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL

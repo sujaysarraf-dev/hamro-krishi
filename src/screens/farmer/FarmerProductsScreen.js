@@ -14,6 +14,7 @@ const FarmerProductsScreen = () => {
     const { colors, isDark } = useTheme();
     const dynamicStyles = getStyles(colors, isDark);
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('all');
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showAddModal, setShowAddModal] = useState(false);
@@ -33,9 +34,12 @@ const FarmerProductsScreen = () => {
         stockQuantity: '',
         stockUnit: 'kilograms',
         status: 'Active',
+        category: 'grain',
         imageUrl: null,
     });
     const [localImage, setLocalImage] = useState(null);
+
+    const productCategories = ['grain', 'vegetable', 'fruit', 'livestock', 'cash crop', 'spice and herb', 'fish'];
 
     useEffect(() => {
         loadProducts();
@@ -88,12 +92,14 @@ const FarmerProductsScreen = () => {
             name: '',
             description: '',
             price: '',
+            priceUnit: 'NPR',
             stockQuantity: '',
             stockUnit: 'kilograms',
             status: 'Active',
-            icon: '🌾',
-            category: '',
+            category: 'grain',
+            imageUrl: null,
         });
+        setLocalImage(null);
         setShowAddModal(true);
     };
 
@@ -107,6 +113,7 @@ const FarmerProductsScreen = () => {
             stockQuantity: product.stock_quantity?.toString() || '',
             stockUnit: product.stock_unit || 'kilograms',
             status: product.status || 'Active',
+            category: product.category || 'grain',
             imageUrl: product.image_url || null,
         });
         setLocalImage(product.image_url || null);
@@ -268,6 +275,7 @@ const FarmerProductsScreen = () => {
                 stock_quantity: parseFloat(formData.stockQuantity),
                 stock_unit: formData.stockUnit,
                 status: formData.status,
+                category: formData.category,
             };
 
             if (editingProduct) {
@@ -393,10 +401,12 @@ const FarmerProductsScreen = () => {
         }
     };
 
-    const filteredProducts = products.filter(product =>
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (product.category && product.category.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
+    const filteredProducts = products.filter(product => {
+        const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (product.category && product.category.toLowerCase().includes(searchQuery.toLowerCase()));
+        const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory;
+        return matchesSearch && matchesCategory;
+    });
 
     const formatPrice = (price) => {
         return new Intl.NumberFormat('en-NP', {
@@ -428,6 +438,53 @@ const FarmerProductsScreen = () => {
                             value={searchQuery}
                             onChangeText={setSearchQuery}
                         />
+                    </View>
+
+                    {/* Category Filter */}
+                    <View style={dynamicStyles.categoryFilterContainer}>
+                        <ScrollView 
+                            horizontal 
+                            showsHorizontalScrollIndicator={false} 
+                            contentContainerStyle={dynamicStyles.categoryFilterContent}
+                        >
+                            <TouchableOpacity
+                                style={[
+                                    dynamicStyles.categoryFilterChip,
+                                    { 
+                                        backgroundColor: selectedCategory === 'all' ? colors.primary : colors.surface,
+                                        borderColor: colors.border,
+                                    }
+                                ]}
+                                onPress={() => setSelectedCategory('all')}
+                            >
+                                <Text style={[
+                                    dynamicStyles.categoryFilterText,
+                                    { color: selectedCategory === 'all' ? '#FFFFFF' : colors.text }
+                                ]}>
+                                    All
+                                </Text>
+                            </TouchableOpacity>
+                            {productCategories.map((category) => (
+                                <TouchableOpacity
+                                    key={category}
+                                    style={[
+                                        dynamicStyles.categoryFilterChip,
+                                        { 
+                                            backgroundColor: selectedCategory === category ? colors.primary : colors.surface,
+                                            borderColor: colors.border,
+                                        }
+                                    ]}
+                                    onPress={() => setSelectedCategory(category)}
+                                >
+                                    <Text style={[
+                                        dynamicStyles.categoryFilterText,
+                                        { color: selectedCategory === category ? '#FFFFFF' : colors.text }
+                                    ]}>
+                                        {category.charAt(0).toUpperCase() + category.slice(1)}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
                     </View>
 
                     {loading ? (
@@ -625,6 +682,33 @@ const FarmerProductsScreen = () => {
                                     </View>
                                 </View>
 
+                                {/* Category */}
+                                <View style={dynamicStyles.formGroup}>
+                                    <Text style={[dynamicStyles.label, { color: colors.text }]}>Category *</Text>
+                                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={dynamicStyles.categoryScrollView}>
+                                        {productCategories.map((category) => (
+                                            <TouchableOpacity
+                                                key={category}
+                                                style={[
+                                                    dynamicStyles.categoryOption,
+                                                    { 
+                                                        backgroundColor: formData.category === category ? colors.primary : colors.surface,
+                                                        borderColor: colors.border,
+                                                    }
+                                                ]}
+                                                onPress={() => setFormData({ ...formData, category })}
+                                            >
+                                                <Text style={[
+                                                    dynamicStyles.categoryOptionText,
+                                                    { color: formData.category === category ? '#FFFFFF' : colors.text }
+                                                ]}>
+                                                    {category.charAt(0).toUpperCase() + category.slice(1)}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </ScrollView>
+                                </View>
+
                                 {/* Status */}
                                 <View style={dynamicStyles.formGroup}>
                                     <Text style={[dynamicStyles.label, { color: colors.text }]}>Status</Text>
@@ -797,6 +881,23 @@ const getStyles = (colors, isDark) => StyleSheet.create({
     searchInput: {
         flex: 1,
         fontSize: 16,
+    },
+    categoryFilterContainer: {
+        marginBottom: 20,
+    },
+    categoryFilterContent: {
+        paddingRight: 20,
+    },
+    categoryFilterChip: {
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 20,
+        marginRight: 8,
+        borderWidth: 1,
+    },
+    categoryFilterText: {
+        fontSize: 14,
+        fontWeight: '600',
     },
     loadingContainer: {
         padding: 40,
@@ -1033,6 +1134,20 @@ const getStyles = (colors, isDark) => StyleSheet.create({
     },
     dropdownItemText: {
         fontSize: 16,
+    },
+    categoryScrollView: {
+        marginTop: 8,
+    },
+    categoryOption: {
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        marginRight: 8,
+        borderWidth: 1,
+    },
+    categoryOptionText: {
+        fontSize: 14,
+        fontWeight: '600',
     },
     statusOptions: {
         flexDirection: 'row',
