@@ -67,14 +67,17 @@ const RegularUserLoginScreen = () => {
                     console.error('Error saving profile:', profileError);
                 }
 
+                // Navigate immediately after successful login
+                router.replace('/user-dashboard');
+                
+                // Show success alert (but navigation already happened)
                 setAlert({
                     visible: true,
                     type: 'success',
                     title: 'Success',
                     message: 'Login successful!',
                     onConfirm: () => {
-                        // Navigate to user dashboard
-                        router.replace('/user-dashboard');
+                        // Already navigated, just close alert
                     }
                 });
             }

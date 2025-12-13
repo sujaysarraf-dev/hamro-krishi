@@ -1,16 +1,18 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import SweetAlert from '../../components/SweetAlert';
 
 const { width } = Dimensions.get('window');
 
 const UserCartScreen = () => {
-    const cartItems = [
+    const [cartItems, setCartItems] = useState([
         {
             id: 1,
             name: 'Padi',
             store: 'Toko Abadi Sentosa',
-            price: 'Rp 1,300,000',
+            price: 1300000,
+            priceDisplay: 'Rp 1,300,000',
             quantity: 1,
             image: '🌾'
         },
@@ -18,11 +20,74 @@ const UserCartScreen = () => {
             id: 2,
             name: 'Cabai',
             store: 'Toko Kelontong',
-            price: 'Rp 30.000/kg',
+            price: 30000,
+            priceDisplay: 'Rp 30.000/kg',
             quantity: 2,
             image: '🌶️'
         },
-    ];
+    ]);
+
+    const [alert, setAlert] = useState({ visible: false, type: 'info', title: '', message: '' });
+
+    // Calculate total
+    const total = useMemo(() => {
+        return cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    }, [cartItems]);
+
+    const formatPrice = (price) => {
+        return new Intl.NumberFormat('id-ID', {
+            style: 'currency',
+            currency: 'IDR',
+            minimumFractionDigits: 0,
+        }).format(price);
+    };
+
+    const increaseQuantity = (itemId) => {
+        setCartItems(prevItems =>
+            prevItems.map(item =>
+                item.id === itemId
+                    ? { ...item, quantity: item.quantity + 1 }
+                    : item
+            )
+        );
+    };
+
+    const decreaseQuantity = (itemId) => {
+        setCartItems(prevItems =>
+            prevItems.map(item =>
+                item.id === itemId && item.quantity > 1
+                    ? { ...item, quantity: item.quantity - 1 }
+                    : item
+            )
+        );
+    };
+
+    const deleteItem = (itemId) => {
+        setCartItems(prevItems => prevItems.filter(item => item.id !== itemId));
+    };
+
+    const handleCheckout = () => {
+        if (cartItems.length === 0) {
+            setAlert({
+                visible: true,
+                type: 'warning',
+                title: 'Empty Cart',
+                message: 'Your cart is empty. Add some items to checkout.'
+            });
+            return;
+        }
+
+        setAlert({
+            visible: true,
+            type: 'success',
+            title: 'Order Placed!',
+            message: `Your order of ${cartItems.length} item(s) totaling ${formatPrice(total)} has been placed successfully!`,
+            onConfirm: () => {
+                // Clear cart after successful checkout
+                setCartItems([]);
+            }
+        });
+    };
 
     return (
         <SafeAreaView style={styles.container}>
@@ -47,25 +112,34 @@ const UserCartScreen = () => {
                                     <View style={styles.itemDetails}>
                                         <Text style={styles.itemName}>{item.name}</Text>
                                         <Text style={styles.itemStore}>{item.store}</Text>
-                                        <Text style={styles.itemPrice}>{item.price}</Text>
+                                        <Text style={styles.itemPrice}>{item.priceDisplay}</Text>
                                         <View style={styles.quantityContainer}>
-                                            <TouchableOpacity style={styles.quantityButton}>
+                                            <TouchableOpacity 
+                                                style={styles.quantityButton}
+                                                onPress={() => decreaseQuantity(item.id)}
+                                            >
                                                 <Text style={styles.quantityButtonText}>-</Text>
                                             </TouchableOpacity>
                                             <Text style={styles.quantityText}>{item.quantity}</Text>
-                                            <TouchableOpacity style={styles.quantityButton}>
+                                            <TouchableOpacity 
+                                                style={styles.quantityButton}
+                                                onPress={() => increaseQuantity(item.id)}
+                                            >
                                                 <Text style={styles.quantityButtonText}>+</Text>
                                             </TouchableOpacity>
                                         </View>
                                     </View>
-                                    <TouchableOpacity style={styles.deleteButton}>
+                                    <TouchableOpacity 
+                                        style={styles.deleteButton}
+                                        onPress={() => deleteItem(item.id)}
+                                    >
                                         <Text style={styles.deleteIcon}>🗑️</Text>
                                     </TouchableOpacity>
                                 </View>
                             ))}
                             <View style={styles.totalContainer}>
                                 <Text style={styles.totalLabel}>Total:</Text>
-                                <Text style={styles.totalAmount}>Rp 1,360,000</Text>
+                                <Text style={styles.totalAmount}>{formatPrice(total)}</Text>
                             </View>
                         </>
                     )}
@@ -73,11 +147,26 @@ const UserCartScreen = () => {
             </ScrollView>
             {cartItems.length > 0 && (
                 <View style={styles.checkoutContainer}>
-                    <TouchableOpacity style={styles.checkoutButton}>
+                    <TouchableOpacity 
+                        style={styles.checkoutButton}
+                        onPress={handleCheckout}
+                    >
                         <Text style={styles.checkoutButtonText}>Checkout</Text>
                     </TouchableOpacity>
                 </View>
             )}
+            <SweetAlert
+                visible={alert.visible}
+                type={alert.type}
+                title={alert.title}
+                message={alert.message}
+                onConfirm={() => {
+                    setAlert({ ...alert, visible: false });
+                    if (alert.onConfirm) {
+                        alert.onConfirm();
+                    }
+                }}
+            />
         </SafeAreaView>
     );
 };

@@ -17,7 +17,12 @@ const RegularUserSignupScreen = () => {
     const [alert, setAlert] = useState({ visible: false, type: 'info', title: '', message: '' });
 
     const handleSignup = async () => {
-        if (!fullName.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
+        if (!fullName || !fullName.trim()) {
+            setAlert({ visible: true, type: 'error', title: 'Error', message: 'Please enter your full name' });
+            return;
+        }
+
+        if (!email.trim() || !password.trim() || !confirmPassword.trim()) {
             setAlert({ visible: true, type: 'error', title: 'Error', message: 'Please fill in all fields' });
             return;
         }
@@ -66,49 +71,60 @@ const RegularUserSignupScreen = () => {
             // Wait a moment to ensure user is fully created and trigger has run
             await new Promise(resolve => setTimeout(resolve, 1000));
 
-            // Sign in the user immediately so RLS policies work
+            // Try to sign in the user (may fail if email confirmation is required)
+            // But we'll continue anyway since the trigger should have created the profile
+            let sessionEstablished = false;
             const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
                 email: email.trim(),
                 password: password,
             });
 
             if (signInError) {
-                console.error('Sign in error:', signInError);
-                // Continue anyway, the trigger should have created the profile
+                // If sign-in fails due to email confirmation, that's okay
+                // The trigger function should have created the profile with SECURITY DEFINER
+                console.log('Sign in skipped (email confirmation may be required):', signInError.message);
+                // Check if we have a session from signup
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session) {
+                    sessionEstablished = true;
+                }
+            } else {
+                sessionEstablished = true;
             }
 
-            // Wait a bit more for session to be established
-            await new Promise(resolve => setTimeout(resolve, 500));
+            // Wait a bit more for session to be established if sign-in succeeded
+            if (sessionEstablished) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
 
             if (data.user) {
-                // Update user profile with regular role
-                // The trigger should have already created a basic profile
-                const { error: profileError } = await supabase
-                    .from('user_profiles')
-                    .update({
+                // Try to update profile if we have a session, otherwise trigger should have handled it
+                if (sessionEstablished) {
+                    const updateData = {
                         email: email.trim(),
                         full_name: fullName.trim(),
                         role: 'regular',
                         updated_at: new Date().toISOString(),
-                    })
-                    .eq('id', data.user.id);
+                    };
 
-                if (profileError) {
-                    console.error('Error updating profile:', profileError);
-                    // Try insert as fallback if update fails (profile might not exist)
-                    const { error: insertError } = await supabase
+                    console.log('Updating profile with data:', updateData);
+
+                    const { data: updateResult, error: profileError } = await supabase
                         .from('user_profiles')
-                        .insert({
-                            id: data.user.id,
-                            email: email.trim(),
-                            full_name: fullName.trim(),
-                            role: 'regular',
-                        });
-                    
-                    if (insertError) {
-                        console.error('Error inserting profile:', insertError);
-                        // Don't throw error, profile might be created by trigger
+                        .update(updateData)
+                        .eq('id', data.user.id)
+                        .select();
+
+                    if (profileError) {
+                        console.error('Error updating profile:', profileError);
+                        // That's okay, trigger should have created it with metadata
+                    } else {
+                        console.log('Profile updated successfully:', updateResult);
                     }
+                } else {
+                    // If no session, the trigger function should have created the profile
+                    // with the metadata from signup (full_name and role)
+                    console.log('Profile should be created by trigger with metadata');
                 }
 
                 setAlert({

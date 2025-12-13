@@ -67,14 +67,17 @@ const FarmerLoginScreen = () => {
                     console.error('Error saving profile:', profileError);
                 }
 
+                // Navigate immediately after successful login
+                router.replace('/farmer-interests');
+                
+                // Show success alert (but navigation already happened)
                 setAlert({
                     visible: true,
                     type: 'success',
                     title: 'Success',
                     message: 'Login successful!',
                     onConfirm: () => {
-                        // Navigate to interest selection screen
-                        router.replace('/farmer-interests');
+                        // Already navigated, just close alert
                     }
                 });
             }
