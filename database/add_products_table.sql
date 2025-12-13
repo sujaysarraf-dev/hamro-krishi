@@ -32,6 +32,14 @@ CREATE INDEX idx_products_status ON products(status);
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 
 -- Create RLS Policies
+-- Allow all authenticated users to view active products
+CREATE POLICY "Authenticated users can view active products"
+    ON products
+    FOR SELECT
+    TO authenticated
+    USING (status = 'Active');
+
+-- Allow farmers to view their own products (including inactive)
 CREATE POLICY "Farmers can view own products"
     ON products
     FOR SELECT

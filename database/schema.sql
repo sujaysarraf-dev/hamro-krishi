@@ -152,6 +152,14 @@ ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 -- ============================================
 
 -- User Profiles Policies
+-- Allow all authenticated users to view basic profile info (for displaying farmer info with products)
+CREATE POLICY "Authenticated users can view basic profiles"
+    ON user_profiles
+    FOR SELECT
+    TO authenticated
+    USING (true);
+
+-- Users can view own profile (more specific, takes precedence)
 CREATE POLICY "Users can view own profile"
     ON user_profiles
     FOR SELECT
@@ -191,6 +199,14 @@ CREATE POLICY "Farmers can delete own farms"
     USING (auth.uid() = farmer_id);
 
 -- Products Policies
+-- Allow all authenticated users to view active products
+CREATE POLICY "Authenticated users can view active products"
+    ON products
+    FOR SELECT
+    TO authenticated
+    USING (status = 'Active');
+
+-- Allow farmers to view their own products (including inactive)
 CREATE POLICY "Farmers can view own products"
     ON products
     FOR SELECT

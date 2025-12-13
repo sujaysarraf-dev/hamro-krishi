@@ -218,32 +218,6 @@ const UserProfileScreen = () => {
                                 {profile?.role ? profile.role.charAt(0).toUpperCase() + profile.role.slice(1) : 'Regular'}
                             </Text>
                         </View>
-
-                        {profile?.interests && (
-                            (() => {
-                                let interestsArray = [];
-                                if (Array.isArray(profile.interests)) {
-                                    interestsArray = profile.interests;
-                                } else if (typeof profile.interests === 'string') {
-                                    try {
-                                        interestsArray = JSON.parse(profile.interests);
-                                    } catch (e) {
-                                        interestsArray = [];
-                                    }
-                                } else if (typeof profile.interests === 'object') {
-                                    interestsArray = Object.values(profile.interests);
-                                }
-                                
-                                return interestsArray.length > 0 ? (
-                                    <View style={[dynamicStyles.infoRow, { borderBottomColor: colors.border }]}>
-                                        <Text style={[dynamicStyles.infoLabel, { color: colors.textSecondary }]}>Interests</Text>
-                                        <Text style={[dynamicStyles.infoValue, { color: colors.text }]}>
-                                            {interestsArray.join(', ')}
-                                        </Text>
-                                    </View>
-                                ) : null;
-                            })()
-                        )}
                     </View>
 
                     {/* Menu Options */}
