@@ -73,9 +73,8 @@ const RegularUserLoginScreen = () => {
                     title: 'Success',
                     message: 'Login successful!',
                     onConfirm: () => {
-                        // Navigate to dashboard or home screen
-                        // router.replace('/regular-dashboard');
-                        console.log('User logged in:', user);
+                        // Navigate to user dashboard
+                        router.replace('/user-dashboard');
                     }
                 });
             }

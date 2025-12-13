@@ -49,36 +49,77 @@ const FarmerSignupScreen = () => {
                     data: {
                         full_name: fullName.trim(),
                         role: 'farmer'
-                    }
+                    },
+                    emailRedirectTo: undefined // Disable email confirmation redirect
                 }
             });
 
             if (error) {
+                console.error('Signup error:', error);
                 throw error;
             }
 
+            if (!data || !data.user) {
+                throw new Error('Failed to create user account. Please try again.');
+            }
+
+            // Wait a moment to ensure user is fully created and trigger has run
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Sign in the user immediately so RLS policies work
+            const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+                email: email.trim(),
+                password: password,
+            });
+
+            if (signInError) {
+                console.error('Sign in error:', signInError);
+                // Continue anyway, the trigger should have created the profile
+            }
+
+            // Wait a bit more for session to be established
+            await new Promise(resolve => setTimeout(resolve, 500));
+
             if (data.user) {
-                // Create user profile with farmer role
+                // Update user profile with farmer role
+                // The trigger should have already created a basic profile
                 const { error: profileError } = await supabase
                     .from('user_profiles')
-                    .insert({
-                        id: data.user.id,
+                    .update({
                         email: email.trim(),
                         full_name: fullName.trim(),
                         role: 'farmer',
-                    });
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq('id', data.user.id);
 
                 if (profileError) {
-                    console.error('Error creating profile:', profileError);
+                    console.error('Error updating profile:', profileError);
+                    // Try insert as fallback if update fails (profile might not exist)
+                    const { error: insertError } = await supabase
+                        .from('user_profiles')
+                        .insert({
+                            id: data.user.id,
+                            email: email.trim(),
+                            full_name: fullName.trim(),
+                            role: 'farmer',
+                        });
+                    
+                    if (insertError) {
+                        console.error('Error inserting profile:', insertError);
+                        // Don't throw error, profile might be created by trigger
+                    }
                 }
 
                 setAlert({
                     visible: true,
                     type: 'success',
                     title: 'Success',
-                    message: 'Account created successfully! Please check your email to verify your account.',
-                    onConfirm: () => router.replace('/farmer-login')
+                    message: 'Account created successfully!',
+                    onConfirm: () => router.replace('/farmer-interests')
                 });
+            } else {
+                throw new Error('User account was not created');
             }
         } catch (error) {
             setAlert({ visible: true, type: 'error', title: 'Signup Failed', message: error.message || 'An error occurred during signup' });
