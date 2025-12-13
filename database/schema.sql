@@ -15,7 +15,16 @@ DROP TRIGGER IF EXISTS update_farms_updated_at ON farms;
 DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
 DROP FUNCTION IF EXISTS public.handle_updated_at() CASCADE;
 
--- Drop policies
+-- Drop storage policies
+DROP POLICY IF EXISTS "Authenticated users can upload images" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated users can update images" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated users can delete images" ON storage.objects;
+DROP POLICY IF EXISTS "Public can view images" ON storage.objects;
+DROP POLICY IF EXISTS "Users can upload own images" ON storage.objects;
+DROP POLICY IF EXISTS "Users can update own images" ON storage.objects;
+DROP POLICY IF EXISTS "Users can delete own images" ON storage.objects;
+
+-- Drop table policies
 DROP POLICY IF EXISTS "Users can view own profile" ON user_profiles;
 DROP POLICY IF EXISTS "Users can update own profile" ON user_profiles;
 DROP POLICY IF EXISTS "Users can insert own profile" ON user_profiles;
@@ -23,6 +32,17 @@ DROP POLICY IF EXISTS "Farmers can view own farms" ON farms;
 DROP POLICY IF EXISTS "Farmers can insert own farms" ON farms;
 DROP POLICY IF EXISTS "Farmers can update own farms" ON farms;
 DROP POLICY IF EXISTS "Farmers can delete own farms" ON farms;
+
+-- Drop user_interests table policies (if table exists)
+DO $$ 
+BEGIN
+    IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'user_interests') THEN
+        DROP POLICY IF EXISTS "Users can view own interests" ON user_interests;
+        DROP POLICY IF EXISTS "Users can insert own interests" ON user_interests;
+        DROP POLICY IF EXISTS "Users can update own interests" ON user_interests;
+        DROP POLICY IF EXISTS "Users can delete own interests" ON user_interests;
+    END IF;
+END $$;
 
 -- Drop indexes
 DROP INDEX IF EXISTS idx_user_profiles_role;
@@ -36,13 +56,8 @@ DROP TABLE IF EXISTS farms CASCADE;
 DROP TABLE IF EXISTS user_interests CASCADE;
 DROP TABLE IF EXISTS user_profiles CASCADE;
 
--- Drop columns if they exist (in case table exists but column doesn't)
-DO $$ 
-BEGIN
-    IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'user_profiles') THEN
-        ALTER TABLE user_profiles DROP COLUMN IF EXISTS interests;
-    END IF;
-END $$;
+-- Drop storage bucket (optional - comment out if you want to keep existing images)
+-- DELETE FROM storage.buckets WHERE id = 'user_images';
 
 -- ============================================
 -- CREATE EXTENSIONS
@@ -200,6 +215,46 @@ CREATE TRIGGER update_farms_updated_at
     EXECUTE FUNCTION public.handle_updated_at();
 
 -- ============================================
+-- STORAGE BUCKET SETUP
+-- ============================================
+
+-- Create the storage bucket for user images (if it doesn't exist)
+-- Note: If bucket creation fails, create it manually in Supabase Dashboard -> Storage
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('user_images', 'user_images', true)
+ON CONFLICT (id) DO UPDATE
+SET public = true;
+
+-- Allow authenticated users to upload to user_images bucket
+CREATE POLICY "Authenticated users can upload images"
+ON storage.objects
+FOR INSERT
+TO authenticated
+WITH CHECK (bucket_id = 'user_images');
+
+-- Allow authenticated users to update images in user_images bucket
+CREATE POLICY "Authenticated users can update images"
+ON storage.objects
+FOR UPDATE
+TO authenticated
+USING (bucket_id = 'user_images')
+WITH CHECK (bucket_id = 'user_images');
+
+-- Allow authenticated users to delete images in user_images bucket
+CREATE POLICY "Authenticated users can delete images"
+ON storage.objects
+FOR DELETE
+TO authenticated
+USING (bucket_id = 'user_images');
+
+-- Allow public to view images (since bucket is public)
+CREATE POLICY "Public can view images"
+ON storage.objects
+FOR SELECT
+TO public
+USING (bucket_id = 'user_images');
+
+-- ============================================
 -- VERIFICATION (Optional - uncomment to verify)
 -- ============================================
 
@@ -211,3 +266,6 @@ CREATE TRIGGER update_farms_updated_at
 -- SELECT column_name, data_type, column_default 
 -- FROM information_schema.columns 
 -- WHERE table_name = 'user_profiles' ORDER BY ordinal_position;
+
+-- Verify storage bucket was created
+-- SELECT id, name, public FROM storage.buckets WHERE id = 'user_images';
