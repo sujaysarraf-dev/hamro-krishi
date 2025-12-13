@@ -16,13 +16,6 @@ const RoleSelectionScreen = () => {
 
     return (
         <SafeAreaView style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()}>
-                    <Text style={styles.skipText}>Skip</Text>
-                </TouchableOpacity>
-            </View>
-
             <View style={styles.content}>
                 <Text style={styles.title}>
                     <Text style={styles.highlight}>Choose</Text> you who{'\n'}want to be
@@ -60,7 +53,13 @@ const RoleSelectionScreen = () => {
 
                 <TouchableOpacity
                     style={styles.continueButton}
-                    onPress={() => console.log('Continue clicked')}
+                    onPress={() => {
+                        if (selectedRole === 'Farmer') {
+                            router.push('/farmer-login');
+                        } else {
+                            router.push('/regular-login');
+                        }
+                    }}
                 >
                     <Text style={styles.continueButtonText}>Continue</Text>
                 </TouchableOpacity>
@@ -82,17 +81,6 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#FFFFFF',
         paddingHorizontal: 24,
-    },
-    header: {
-        height: 50,
-        flexDirection: 'row',
-        justifyContent: 'flex-end',
-        alignItems: 'center',
-    },
-    skipText: {
-        fontSize: 16,
-        color: '#228B22',
-        fontWeight: '600',
     },
     content: {
         flex: 1,
