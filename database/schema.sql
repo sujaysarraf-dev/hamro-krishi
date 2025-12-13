@@ -10,6 +10,7 @@
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 DROP TRIGGER IF EXISTS update_user_profiles_updated_at ON user_profiles;
 DROP TRIGGER IF EXISTS update_farms_updated_at ON farms;
+DROP TRIGGER IF EXISTS update_products_updated_at ON products;
 
 -- Drop functions
 DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
@@ -32,6 +33,10 @@ DROP POLICY IF EXISTS "Farmers can view own farms" ON farms;
 DROP POLICY IF EXISTS "Farmers can insert own farms" ON farms;
 DROP POLICY IF EXISTS "Farmers can update own farms" ON farms;
 DROP POLICY IF EXISTS "Farmers can delete own farms" ON farms;
+DROP POLICY IF EXISTS "Farmers can view own products" ON products;
+DROP POLICY IF EXISTS "Farmers can insert own products" ON products;
+DROP POLICY IF EXISTS "Farmers can update own products" ON products;
+DROP POLICY IF EXISTS "Farmers can delete own products" ON products;
 
 -- Drop user_interests table policies (if table exists)
 DO $$ 
@@ -50,8 +55,11 @@ DROP INDEX IF EXISTS idx_user_profiles_email;
 DROP INDEX IF EXISTS idx_user_profiles_interests;
 DROP INDEX IF EXISTS idx_farms_farmer_id;
 DROP INDEX IF EXISTS idx_user_interests_user_id;
+DROP INDEX IF EXISTS idx_products_farmer_id;
+DROP INDEX IF EXISTS idx_products_status;
 
 -- Drop tables (in reverse dependency order)
+DROP TABLE IF EXISTS products CASCADE;
 DROP TABLE IF EXISTS farms CASCADE;
 DROP TABLE IF EXISTS user_interests CASCADE;
 DROP TABLE IF EXISTS user_profiles CASCADE;
@@ -95,6 +103,21 @@ CREATE TABLE farms (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
+-- Create products table (for farmers to manage their crops/products)
+CREATE TABLE products (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    farmer_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    description TEXT,
+    price DECIMAL(10, 2) NOT NULL,
+    stock_quantity DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    stock_unit TEXT NOT NULL DEFAULT 'kilograms',
+    status TEXT NOT NULL DEFAULT 'Active' CHECK (status IN ('Active', 'Inactive')),
+    image_url TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);
+
 -- ============================================
 -- CREATE INDEXES
 -- ============================================
@@ -107,12 +130,17 @@ CREATE INDEX idx_user_profiles_interests ON user_profiles USING GIN (interests);
 -- Index for farms
 CREATE INDEX idx_farms_farmer_id ON farms(farmer_id);
 
+-- Indexes for products
+CREATE INDEX idx_products_farmer_id ON products(farmer_id);
+CREATE INDEX idx_products_status ON products(status);
+
 -- ============================================
 -- ENABLE ROW LEVEL SECURITY
 -- ============================================
 
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE farms ENABLE ROW LEVEL SECURITY;
+ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 
 -- ============================================
 -- CREATE RLS POLICIES
@@ -154,6 +182,28 @@ CREATE POLICY "Farmers can update own farms"
 
 CREATE POLICY "Farmers can delete own farms"
     ON farms
+    FOR DELETE
+    USING (auth.uid() = farmer_id);
+
+-- Products Policies
+CREATE POLICY "Farmers can view own products"
+    ON products
+    FOR SELECT
+    USING (auth.uid() = farmer_id);
+
+CREATE POLICY "Farmers can insert own products"
+    ON products
+    FOR INSERT
+    WITH CHECK (auth.uid() = farmer_id);
+
+CREATE POLICY "Farmers can update own products"
+    ON products
+    FOR UPDATE
+    USING (auth.uid() = farmer_id)
+    WITH CHECK (auth.uid() = farmer_id);
+
+CREATE POLICY "Farmers can delete own products"
+    ON products
     FOR DELETE
     USING (auth.uid() = farmer_id);
 
@@ -211,6 +261,12 @@ CREATE TRIGGER update_user_profiles_updated_at
 -- Trigger to update updated_at for farms
 CREATE TRIGGER update_farms_updated_at
     BEFORE UPDATE ON farms
+    FOR EACH ROW
+    EXECUTE FUNCTION public.handle_updated_at();
+
+-- Trigger to update updated_at for products
+CREATE TRIGGER update_products_updated_at
+    BEFORE UPDATE ON products
     FOR EACH ROW
     EXECUTE FUNCTION public.handle_updated_at();
 

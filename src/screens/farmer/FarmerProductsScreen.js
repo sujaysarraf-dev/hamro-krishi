@@ -1,29 +1,366 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Dimensions } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Dimensions, Modal, ActivityIndicator, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
+import { supabase } from '../../config/supabase';
+import { useFocusEffect } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
+import SweetAlert from '../../components/SweetAlert';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 const FarmerProductsScreen = () => {
     const { colors, isDark } = useTheme();
     const dynamicStyles = getStyles(colors, isDark);
     const [searchQuery, setSearchQuery] = useState('');
+    const [products, setProducts] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [editingProduct, setEditingProduct] = useState(null);
+    const [saving, setSaving] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const [showUnitDropdown, setShowUnitDropdown] = useState(false);
+    const [alert, setAlert] = useState({ visible: false, type: 'info', title: '', message: '' });
 
-    // Dummy products data
-    const products = [
-        { id: 1, name: 'Rice', price: 'Rp 1,300,000', stock: '50kg', status: 'Active', icon: '🌾' },
-        { id: 2, name: 'Wheat', price: 'Rp 800,000', stock: '30kg', status: 'Active', icon: '🌾' },
-        { id: 3, name: 'Corn', price: 'Rp 600,000', stock: '25kg', status: 'Active', icon: '🌽' },
-        { id: 4, name: 'Tomato', price: 'Rp 15,000/kg', stock: '20kg', status: 'Low Stock', icon: '🍅' },
-        { id: 5, name: 'Potato', price: 'Rp 12,000/kg', stock: '40kg', status: 'Active', icon: '🥔' },
-    ];
+    // Form state
+    const [formData, setFormData] = useState({
+        name: '',
+        description: '',
+        price: '',
+        priceUnit: 'NPR',
+        stockQuantity: '',
+        stockUnit: 'kilograms',
+        status: 'Active',
+        imageUrl: null,
+    });
+    const [localImage, setLocalImage] = useState(null);
+
+    useEffect(() => {
+        loadProducts();
+    }, []);
+
+    useFocusEffect(
+        React.useCallback(() => {
+            loadProducts();
+        }, [])
+    );
+
+    const loadProducts = async () => {
+        try {
+            setLoading(true);
+            const { data: { user } } = await supabase.auth.getUser();
+            
+            if (!user) {
+                setLoading(false);
+                return;
+            }
+
+            const { data, error } = await supabase
+                .from('products')
+                .select('*')
+                .eq('farmer_id', user.id)
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error('Error loading products:', error);
+                throw error;
+            }
+
+            setProducts(data || []);
+        } catch (error) {
+            console.error('Error loading products:', error);
+            setAlert({
+                visible: true,
+                type: 'error',
+                title: 'Error',
+                message: 'Failed to load products. Please try again.',
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleAddProduct = () => {
+        setEditingProduct(null);
+        setFormData({
+            name: '',
+            description: '',
+            price: '',
+            stockQuantity: '',
+            stockUnit: 'kilograms',
+            status: 'Active',
+            icon: '🌾',
+            category: '',
+        });
+        setShowAddModal(true);
+    };
+
+    const handleEditProduct = (product) => {
+        setEditingProduct(product);
+        setFormData({
+            name: product.name || '',
+            description: product.description || '',
+            price: product.price?.toString() || '',
+            priceUnit: 'NPR',
+            stockQuantity: product.stock_quantity?.toString() || '',
+            stockUnit: product.stock_unit || 'kilograms',
+            status: product.status || 'Active',
+            imageUrl: product.image_url || null,
+        });
+        setLocalImage(product.image_url || null);
+        setShowAddModal(true);
+    };
+
+    const pickImage = async () => {
+        try {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+                setAlert({
+                    visible: true,
+                    type: 'warning',
+                    title: 'Permission Denied',
+                    message: 'Camera roll permission is required to upload images.',
+                });
+                return;
+            }
+
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images'],
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.8,
+            });
+
+            if (!result.canceled && result.assets && result.assets[0]) {
+                setLocalImage(result.assets[0].uri);
+            }
+        } catch (error) {
+            console.error('Error picking image:', error);
+            setAlert({
+                visible: true,
+                type: 'error',
+                title: 'Error',
+                message: 'Failed to pick image',
+            });
+        }
+    };
+
+    const uploadImage = async (imageUri, productId) => {
+        try {
+            setUploading(true);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('User not authenticated');
+
+            const fileExt = imageUri.split('.').pop()?.toLowerCase() || 'jpg';
+            const fileName = `product-${productId || Date.now()}-${Date.now()}.${fileExt}`;
+            const filePath = `products/${fileName}`;
+
+            const base64 = await FileSystem.readAsStringAsync(imageUri, {
+                encoding: FileSystem.EncodingType.Base64,
+            });
+
+            const byteCharacters = atob(base64);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+
+            const { data, error: uploadError } = await supabase.storage
+                .from('user_images')
+                .upload(filePath, byteArray, {
+                    contentType: `image/${fileExt}`,
+                    upsert: true,
+                    cacheControl: '3600',
+                });
+
+            if (uploadError) throw uploadError;
+
+            const { data: { publicUrl } } = supabase.storage
+                .from('user_images')
+                .getPublicUrl(filePath);
+
+            return publicUrl;
+        } catch (error) {
+            console.error('Error uploading image:', error);
+            throw error;
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const handleSaveProduct = async () => {
+        if (!formData.name.trim() || !formData.price.trim() || !formData.stockQuantity.trim()) {
+            setAlert({
+                visible: true,
+                type: 'warning',
+                title: 'Validation Error',
+                message: 'Please fill in all required fields (Name, Price, Stock Quantity).',
+            });
+            return;
+        }
+
+        try {
+            setSaving(true);
+            const { data: { user } } = await supabase.auth.getUser();
+            
+            if (!user) {
+                throw new Error('User not authenticated');
+            }
+
+            const productData = {
+                farmer_id: user.id,
+                name: formData.name.trim(),
+                description: formData.description.trim() || null,
+                price: parseFloat(formData.price),
+                stock_quantity: parseFloat(formData.stockQuantity),
+                stock_unit: formData.stockUnit,
+                status: formData.status,
+            };
+
+            if (editingProduct) {
+                // Upload image if a new one was selected
+                if (localImage && localImage !== formData.imageUrl) {
+                    const imageUrl = await uploadImage(localImage, editingProduct.id);
+                    productData.image_url = imageUrl;
+                } else {
+                    productData.image_url = formData.imageUrl;
+                }
+
+                // Update existing product
+                const { error } = await supabase
+                    .from('products')
+                    .update(productData)
+                    .eq('id', editingProduct.id)
+                    .eq('farmer_id', user.id);
+
+                if (error) throw error;
+
+                setAlert({
+                    visible: true,
+                    type: 'success',
+                    title: 'Success',
+                    message: 'Product updated successfully!',
+                    onConfirm: () => {
+                        setShowAddModal(false);
+                        loadProducts();
+                    },
+                });
+            } else {
+                // Insert new product first to get the ID
+                const { data: newProduct, error: insertError } = await supabase
+                    .from('products')
+                    .insert(productData)
+                    .select()
+                    .single();
+
+                if (insertError) throw insertError;
+
+                // If image was uploaded, update the product with the image URL
+                if (localImage && localImage !== formData.imageUrl) {
+                    const uploadedImageUrl = await uploadImage(localImage, newProduct.id);
+                    const { error: updateError } = await supabase
+                        .from('products')
+                        .update({ image_url: uploadedImageUrl })
+                        .eq('id', newProduct.id);
+
+                    if (updateError) {
+                        console.error('Error updating product image:', updateError);
+                    }
+                }
+
+                setAlert({
+                    visible: true,
+                    type: 'success',
+                    title: 'Success',
+                    message: 'Product added successfully!',
+                    onConfirm: () => {
+                        setShowAddModal(false);
+                        loadProducts();
+                    },
+                });
+            }
+        } catch (error) {
+            console.error('Error saving product:', error);
+            setAlert({
+                visible: true,
+                type: 'error',
+                title: 'Error',
+                message: error.message || 'Failed to save product. Please try again.',
+            });
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleDeleteProduct = async (productId) => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            
+            if (!user) {
+                throw new Error('User not authenticated');
+            }
+
+            const { error } = await supabase
+                .from('products')
+                .delete()
+                .eq('id', productId)
+                .eq('farmer_id', user.id);
+
+            if (error) throw error;
+
+            setAlert({
+                visible: true,
+                type: 'success',
+                title: 'Success',
+                message: 'Product deleted successfully!',
+                onConfirm: () => {
+                    loadProducts();
+                },
+            });
+        } catch (error) {
+            console.error('Error deleting product:', error);
+            setAlert({
+                visible: true,
+                type: 'error',
+                title: 'Error',
+                message: 'Failed to delete product. Please try again.',
+            });
+        }
+    };
+
+    const getStatusColor = (status) => {
+        switch (status) {
+            case 'Active':
+                return '#4CAF50';
+            case 'Inactive':
+                return '#9E9E9E';
+            default:
+                return colors.textSecondary;
+        }
+    };
+
+    const filteredProducts = products.filter(product =>
+        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (product.category && product.category.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+
+    const formatPrice = (price) => {
+        return new Intl.NumberFormat('en-NP', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+        }).format(price);
+    };
 
     return (
         <SafeAreaView style={[dynamicStyles.container, { backgroundColor: colors.background }]}>
             <View style={[dynamicStyles.header, { borderBottomColor: colors.border }]}>
                 <Text style={[dynamicStyles.headerTitle, { color: colors.text }]}>My Products</Text>
-                <TouchableOpacity style={[dynamicStyles.addButton, { backgroundColor: colors.primary }]}>
+                <TouchableOpacity 
+                    style={[dynamicStyles.addButton, { backgroundColor: colors.primary }]}
+                    onPress={handleAddProduct}
+                >
                     <Text style={dynamicStyles.addButtonText}>+ Add</Text>
                 </TouchableOpacity>
             </View>
@@ -41,48 +378,308 @@ const FarmerProductsScreen = () => {
                         />
                     </View>
 
-                    {/* Products List */}
-                    <View style={dynamicStyles.productsList}>
-                        {products.map((product) => (
-                            <View key={product.id} style={[dynamicStyles.productCard, { backgroundColor: colors.card }]}>
-                                <View style={[dynamicStyles.productImageContainer, { backgroundColor: colors.surface }]}>
-                                    <Text style={dynamicStyles.productEmoji}>{product.icon}</Text>
-                                </View>
-                                <View style={dynamicStyles.productDetails}>
-                                    <Text style={[dynamicStyles.productName, { color: colors.text }]}>{product.name}</Text>
-                                    <Text style={[dynamicStyles.productPrice, { color: colors.primary }]}>{product.price}</Text>
-                                    <Text style={[dynamicStyles.productStock, { color: colors.textSecondary }]}>Stock: {product.stock}</Text>
-                                    <View style={dynamicStyles.productActions}>
-                                        <View style={[
-                                            dynamicStyles.statusBadge,
-                                            { backgroundColor: product.status === 'Active' ? '#E8F5E9' : '#FFF3E0' }
-                                        ]}>
-                                            <Text style={[
-                                                dynamicStyles.statusText,
-                                                { color: product.status === 'Active' ? '#4CAF50' : '#FF9800' }
-                                            ]}>
-                                                {product.status}
-                                            </Text>
-                                        </View>
-                                        <TouchableOpacity style={dynamicStyles.editButton}>
-                                            <Text style={[dynamicStyles.editButtonText, { color: colors.primary }]}>Edit</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
-                            </View>
-                        ))}
-                    </View>
-
-                    {/* Empty State (if no products) */}
-                    {products.length === 0 && (
-                        <View style={dynamicStyles.emptyContainer}>
-                            <Text style={dynamicStyles.emptyIcon}>🌾</Text>
-                            <Text style={[dynamicStyles.emptyText, { color: colors.text }]}>No products yet</Text>
-                            <Text style={[dynamicStyles.emptySubtext, { color: colors.textSecondary }]}>Add your first product to get started</Text>
+                    {loading ? (
+                        <View style={dynamicStyles.loadingContainer}>
+                            <ActivityIndicator size="large" color={colors.primary} />
                         </View>
+                    ) : (
+                        <>
+                            {/* Products List */}
+                            {filteredProducts.length > 0 ? (
+                                <View style={dynamicStyles.productsList}>
+                                    {filteredProducts.map((product) => (
+                                        <View key={product.id} style={[dynamicStyles.productCard, { backgroundColor: colors.card }]}>
+                                            <View style={[dynamicStyles.productImageContainer, { backgroundColor: colors.surface }]}>
+                                                {product.image_url ? (
+                                                    <Image source={{ uri: product.image_url }} style={dynamicStyles.productImage} />
+                                                ) : (
+                                                    <Text style={dynamicStyles.productEmoji}>🌾</Text>
+                                                )}
+                                            </View>
+                                            <View style={dynamicStyles.productDetails}>
+                                                <Text style={[dynamicStyles.productName, { color: colors.text }]}>{product.name}</Text>
+                                                <Text style={[dynamicStyles.productPrice, { color: colors.primary }]}>
+                                                    NPR {formatPrice(product.price)}
+                                                </Text>
+                                                <Text style={[dynamicStyles.productStock, { color: colors.textSecondary }]}>
+                                                    Stock: {product.stock_quantity} {product.stock_unit}
+                                                </Text>
+                                                <View style={dynamicStyles.productActions}>
+                                                    <View style={[
+                                                        dynamicStyles.statusBadge,
+                                                        { backgroundColor: getStatusColor(product.status) + '20' }
+                                                    ]}>
+                                                        <Text style={[
+                                                            dynamicStyles.statusText,
+                                                            { color: getStatusColor(product.status) }
+                                                        ]}>
+                                                            {product.status}
+                                                        </Text>
+                                                    </View>
+                                                    <View style={dynamicStyles.actionButtons}>
+                                                        <TouchableOpacity 
+                                                            style={dynamicStyles.editButton}
+                                                            onPress={() => handleEditProduct(product)}
+                                                        >
+                                                            <Text style={[dynamicStyles.editButtonText, { color: colors.primary }]}>Edit</Text>
+                                                        </TouchableOpacity>
+                                                        <TouchableOpacity 
+                                                            style={dynamicStyles.deleteButton}
+                                                            onPress={() => {
+                                                                Alert.alert(
+                                                                    'Delete Product',
+                                                                    `Are you sure you want to delete ${product.name}?`,
+                                                                    [
+                                                                        { text: 'Cancel', style: 'cancel' },
+                                                                        { 
+                                                                            text: 'Delete', 
+                                                                            style: 'destructive',
+                                                                            onPress: () => handleDeleteProduct(product.id)
+                                                                        },
+                                                                    ]
+                                                                );
+                                                            }}
+                                                        >
+                                                            <Text style={[dynamicStyles.deleteButtonText, { color: colors.error }]}>Delete</Text>
+                                                        </TouchableOpacity>
+                                                    </View>
+                                                </View>
+                                            </View>
+                                        </View>
+                                    ))}
+                                </View>
+                            ) : (
+                                <View style={dynamicStyles.emptyContainer}>
+                                    <Text style={dynamicStyles.emptyIcon}>🌾</Text>
+                                    <Text style={[dynamicStyles.emptyText, { color: colors.text }]}>
+                                        {searchQuery ? 'No products found' : 'No products yet'}
+                                    </Text>
+                                    <Text style={[dynamicStyles.emptySubtext, { color: colors.textSecondary }]}>
+                                        {searchQuery ? 'Try a different search term' : 'Add your first product to get started'}
+                                    </Text>
+                                </View>
+                            )}
+                        </>
                     )}
                 </View>
             </ScrollView>
+
+            {/* Add/Edit Product Modal */}
+            <Modal
+                visible={showAddModal}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setShowAddModal(false)}
+            >
+                <View style={dynamicStyles.modalOverlay}>
+                    <View style={[dynamicStyles.modalContent, { backgroundColor: colors.card }]}>
+                        <View style={dynamicStyles.modalHeader}>
+                            <Text style={[dynamicStyles.modalTitle, { color: colors.text }]}>
+                                {editingProduct ? 'Edit Product' : 'Add Product'}
+                            </Text>
+                            <TouchableOpacity 
+                                onPress={() => setShowAddModal(false)}
+                                style={dynamicStyles.closeButton}
+                            >
+                                <Text style={[dynamicStyles.closeButtonText, { color: colors.text }]}>✕</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView 
+                            showsVerticalScrollIndicator={true} 
+                            style={dynamicStyles.modalScrollView}
+                            contentContainerStyle={dynamicStyles.modalScrollContent}
+                        >
+                            <View style={dynamicStyles.formContainer}>
+                                {/* Product Image */}
+                                <View style={dynamicStyles.formGroup}>
+                                    <Text style={[dynamicStyles.label, { color: colors.text }]}>Product Image</Text>
+                                    <View style={dynamicStyles.imageSection}>
+                                        <View style={[dynamicStyles.imageContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                                            {localImage ? (
+                                                <Image source={{ uri: localImage }} style={dynamicStyles.productFormImage} />
+                                            ) : (
+                                                <Text style={dynamicStyles.imagePlaceholder}>📷</Text>
+                                            )}
+                                        </View>
+                                        <TouchableOpacity 
+                                            style={[dynamicStyles.uploadButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                                            onPress={pickImage}
+                                            disabled={uploading}
+                                        >
+                                            {uploading ? (
+                                                <ActivityIndicator color={colors.primary} size="small" />
+                                            ) : (
+                                                <Text style={[dynamicStyles.uploadButtonText, { color: colors.primary }]}>Upload Image</Text>
+                                            )}
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+
+                                {/* Name */}
+                                <View style={dynamicStyles.formGroup}>
+                                    <Text style={[dynamicStyles.label, { color: colors.text }]}>Product Name *</Text>
+                                    <TextInput
+                                        style={[dynamicStyles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
+                                        value={formData.name}
+                                        onChangeText={(text) => setFormData({ ...formData, name: text })}
+                                        placeholder="e.g., Rice, Wheat, Tomato"
+                                        placeholderTextColor={colors.textSecondary}
+                                    />
+                                </View>
+
+                                {/* Description */}
+                                <View style={dynamicStyles.formGroup}>
+                                    <Text style={[dynamicStyles.label, { color: colors.text }]}>Description</Text>
+                                    <TextInput
+                                        style={[dynamicStyles.textArea, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
+                                        value={formData.description}
+                                        onChangeText={(text) => setFormData({ ...formData, description: text })}
+                                        placeholder="Product description (optional)"
+                                        placeholderTextColor={colors.textSecondary}
+                                        multiline
+                                        numberOfLines={3}
+                                    />
+                                </View>
+
+                                {/* Price */}
+                                <View style={dynamicStyles.formGroup}>
+                                    <Text style={[dynamicStyles.label, { color: colors.text }]}>Price (NPR) *</Text>
+                                    <TextInput
+                                        style={[dynamicStyles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
+                                        value={formData.price}
+                                        onChangeText={(text) => setFormData({ ...formData, price: text.replace(/[^0-9.]/g, '') })}
+                                        placeholder="e.g., 1300"
+                                        placeholderTextColor={colors.textSecondary}
+                                        keyboardType="numeric"
+                                    />
+                                </View>
+
+                                {/* Stock Quantity and Unit */}
+                                <View style={dynamicStyles.formRow}>
+                                    <View style={[dynamicStyles.formGroup, { flex: 2, marginRight: 12, marginBottom: 0 }]}>
+                                        <Text style={[dynamicStyles.label, { color: colors.text }]}>Stock Quantity *</Text>
+                                        <TextInput
+                                            style={[dynamicStyles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
+                                            value={formData.stockQuantity}
+                                            onChangeText={(text) => setFormData({ ...formData, stockQuantity: text.replace(/[^0-9.]/g, '') })}
+                                            placeholder="e.g., 50"
+                                            placeholderTextColor={colors.textSecondary}
+                                            keyboardType="numeric"
+                                        />
+                                    </View>
+                                    <View style={[dynamicStyles.formGroup, { flex: 1, marginBottom: 0 }]}>
+                                        <Text style={[dynamicStyles.label, { color: colors.text }]}>Unit *</Text>
+                                        <TouchableOpacity 
+                                            style={[dynamicStyles.dropdown, { backgroundColor: colors.background, borderColor: colors.border }]}
+                                            onPress={() => setShowUnitDropdown(true)}
+                                        >
+                                            <Text style={[dynamicStyles.dropdownText, { color: colors.text }]}>{formData.stockUnit}</Text>
+                                            <Text style={[dynamicStyles.dropdownArrow, { color: colors.textSecondary }]}>▼</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+
+                                {/* Status */}
+                                <View style={dynamicStyles.formGroup}>
+                                    <Text style={[dynamicStyles.label, { color: colors.text }]}>Status</Text>
+                                    <View style={dynamicStyles.statusOptions}>
+                                        {['Active', 'Inactive'].map((status) => (
+                                            <TouchableOpacity
+                                                key={status}
+                                                style={[
+                                                    dynamicStyles.statusOption,
+                                                    {
+                                                        backgroundColor: formData.status === status ? colors.primary : colors.surface,
+                                                        borderColor: colors.border,
+                                                    }
+                                                ]}
+                                                onPress={() => setFormData({ ...formData, status })}
+                                            >
+                                                <Text style={[
+                                                    dynamicStyles.statusOptionText,
+                                                    { color: formData.status === status ? '#FFFFFF' : colors.text }
+                                                ]}>
+                                                    {status}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                </View>
+
+                                {/* Save Button */}
+                                <TouchableOpacity
+                                    style={[dynamicStyles.saveButton, { backgroundColor: colors.primary }, saving && dynamicStyles.saveButtonDisabled]}
+                                    onPress={handleSaveProduct}
+                                    disabled={saving}
+                                >
+                                    {saving ? (
+                                        <ActivityIndicator color="#FFFFFF" />
+                                    ) : (
+                                        <Text style={dynamicStyles.saveButtonText}>
+                                            {editingProduct ? 'Update Product' : 'Add Product'}
+                                        </Text>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Unit Dropdown Modal */}
+            <Modal
+                visible={showUnitDropdown}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowUnitDropdown(false)}
+            >
+                <TouchableOpacity 
+                    style={dynamicStyles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={() => setShowUnitDropdown(false)}
+                >
+                    <View style={[dynamicStyles.dropdownMenu, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                        {['grams', 'kilograms', 'Quintal', 'dozens'].map((unit) => (
+                            <TouchableOpacity
+                                key={unit}
+                                style={[
+                                    dynamicStyles.dropdownItem,
+                                    { 
+                                        backgroundColor: formData.stockUnit === unit ? colors.primary + '20' : 'transparent',
+                                        borderBottomColor: colors.border,
+                                    }
+                                ]}
+                                onPress={() => {
+                                    setFormData({ ...formData, stockUnit: unit });
+                                    setShowUnitDropdown(false);
+                                }}
+                            >
+                                <Text style={[
+                                    dynamicStyles.dropdownItemText,
+                                    { 
+                                        color: formData.stockUnit === unit ? colors.primary : colors.text,
+                                        fontWeight: formData.stockUnit === unit ? '600' : '400',
+                                    }
+                                ]}>
+                                    {unit}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </TouchableOpacity>
+            </Modal>
+
+            <SweetAlert
+                visible={alert.visible}
+                type={alert.type}
+                title={alert.title}
+                message={alert.message}
+                onConfirm={() => {
+                    setAlert({ ...alert, visible: false });
+                    if (alert.onConfirm) alert.onConfirm();
+                }}
+            />
         </SafeAreaView>
     );
 };
@@ -136,6 +733,11 @@ const getStyles = (colors, isDark) => StyleSheet.create({
         flex: 1,
         fontSize: 16,
     },
+    loadingContainer: {
+        padding: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     productsList: {
         marginTop: 8,
     },
@@ -155,6 +757,11 @@ const getStyles = (colors, isDark) => StyleSheet.create({
     },
     productEmoji: {
         fontSize: 40,
+    },
+    productImage: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 8,
     },
     productDetails: {
         flex: 1,
@@ -187,11 +794,23 @@ const getStyles = (colors, isDark) => StyleSheet.create({
         fontSize: 12,
         fontWeight: '600',
     },
+    actionButtons: {
+        flexDirection: 'row',
+        gap: 8,
+    },
     editButton: {
         paddingVertical: 4,
         paddingHorizontal: 12,
     },
     editButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    deleteButton: {
+        paddingVertical: 4,
+        paddingHorizontal: 12,
+    },
+    deleteButtonText: {
         fontSize: 14,
         fontWeight: '600',
     },
@@ -213,7 +832,174 @@ const getStyles = (colors, isDark) => StyleSheet.create({
     emptySubtext: {
         fontSize: 14,
     },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modalContent: {
+        backgroundColor: colors.card,
+        borderRadius: 24,
+        width: '90%',
+        height: height * 0.8,
+        flexDirection: 'column',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+    },
+    modalTitle: {
+        fontSize: 24,
+        fontWeight: '700',
+    },
+    closeButton: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: colors.surface,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    closeButtonText: {
+        fontSize: 20,
+        fontWeight: '600',
+    },
+    modalScrollView: {
+        flex: 1,
+    },
+    modalScrollContent: {
+        flexGrow: 1,
+        paddingBottom: 20,
+    },
+    formContainer: {
+        padding: 20,
+    },
+    formGroup: {
+        marginBottom: 20,
+    },
+    formRow: {
+        flexDirection: 'row',
+        marginBottom: 20,
+    },
+    label: {
+        fontSize: 14,
+        fontWeight: '600',
+        marginBottom: 8,
+    },
+    input: {
+        borderWidth: 1,
+        borderRadius: 12,
+        padding: 16,
+        fontSize: 16,
+    },
+    textArea: {
+        borderWidth: 1,
+        borderRadius: 12,
+        padding: 16,
+        fontSize: 16,
+        minHeight: 80,
+        textAlignVertical: 'top',
+    },
+    imageSection: {
+        alignItems: 'center',
+        marginTop: 8,
+    },
+    imageContainer: {
+        width: 120,
+        height: 120,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 16,
+        borderWidth: 1,
+        overflow: 'hidden',
+    },
+    productFormImage: {
+        width: '100%',
+        height: '100%',
+    },
+    imagePlaceholder: {
+        fontSize: 48,
+    },
+    uploadButton: {
+        paddingVertical: 12,
+        paddingHorizontal: 24,
+        borderRadius: 8,
+        borderWidth: 1,
+    },
+    uploadButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    dropdown: {
+        borderWidth: 1,
+        borderRadius: 12,
+        padding: 16,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    dropdownText: {
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    dropdownArrow: {
+        fontSize: 12,
+        marginLeft: 8,
+    },
+    dropdownMenu: {
+        borderRadius: 12,
+        borderWidth: 1,
+        overflow: 'hidden',
+        minWidth: 150,
+        maxHeight: 300,
+        alignSelf: 'center',
+        marginTop: '50%',
+    },
+    dropdownItem: {
+        paddingVertical: 16,
+        paddingHorizontal: 20,
+        borderBottomWidth: 1,
+    },
+    dropdownItemText: {
+        fontSize: 16,
+    },
+    statusOptions: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginTop: 8,
+    },
+    statusOption: {
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        borderWidth: 1,
+    },
+    statusOptionText: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    saveButton: {
+        paddingVertical: 16,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 8,
+    },
+    saveButtonDisabled: {
+        opacity: 0.6,
+    },
+    saveButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '600',
+    },
 });
 
 export default FarmerProductsScreen;
-

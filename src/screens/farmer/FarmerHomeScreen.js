@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Dimensions, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Dimensions, ActivityIndicator, Alert, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import { useFocusEffect } from 'expo-router';
@@ -19,6 +19,8 @@ const FarmerHomeScreen = () => {
     const [location, setLocation] = useState(null);
     const [locationName, setLocationName] = useState('Loading location...');
     const [weatherData, setWeatherData] = useState(null);
+    const [detailedWeatherData, setDetailedWeatherData] = useState(null);
+    const [showWeatherModal, setShowWeatherModal] = useState(false);
     
     // Get current date formatted
     const getFormattedDate = () => {
@@ -99,19 +101,51 @@ const FarmerHomeScreen = () => {
 
             setLocation(currentLocation.coords);
 
-            // Reverse geocode to get location name
+            // Reverse geocode to get location name in English
             const reverseGeocode = await Location.reverseGeocodeAsync({
                 latitude: currentLocation.coords.latitude,
                 longitude: currentLocation.coords.longitude,
+                language: 'en', // Request English language
             });
 
             if (reverseGeocode && reverseGeocode.length > 0) {
                 const address = reverseGeocode[0];
                 const locationParts = [];
-                if (address.city) locationParts.push(address.city);
-                if (address.region) locationParts.push(address.region);
-                if (address.country) locationParts.push(address.country);
-                setLocationName(locationParts.join(', ') || 'Current Location');
+                
+                // Add street/suburb/neighborhood first (most specific)
+                if (address.street) {
+                    locationParts.push(address.street);
+                } else if (address.district) {
+                    locationParts.push(address.district);
+                } else if (address.subregion) {
+                    locationParts.push(address.subregion);
+                } else if (address.name) {
+                    locationParts.push(address.name);
+                }
+                
+                // Add city
+                if (address.city) {
+                    locationParts.push(address.city);
+                }
+                
+                // Add region/state if different from city
+                if (address.region && address.region !== address.city) {
+                    locationParts.push(address.region);
+                }
+                
+                // Add country only if we don't have enough info
+                if (locationParts.length === 0 && address.country) {
+                    locationParts.push(address.country);
+                }
+                
+                const preciseLocation = locationParts.length > 0 ? locationParts.join(', ') : 'Current Location';
+                setLocationName(preciseLocation);
+                
+                // Update detailed weather data with precise location
+                setDetailedWeatherData(prev => prev ? {
+                    ...prev,
+                    cityName: preciseLocation,
+                } : null);
             } else {
                 setLocationName('Current Location');
             }
@@ -158,7 +192,7 @@ const FarmerHomeScreen = () => {
             
             if (currentData.data && currentData.data.length > 0) {
                 const weather = currentData.data[0];
-                setWeatherData({
+                const basicData = {
                     temperature: Math.round(weather.temp),
                     description: weather.weather.description,
                     icon: weather.weather.icon,
@@ -168,6 +202,25 @@ const FarmerHomeScreen = () => {
                     soilTemp: Math.round(weather.temp + 6), // Approximate soil temp (usually 5-7°C warmer)
                     sunrise: sunrise,
                     sunset: sunset,
+                };
+                setWeatherData(basicData);
+                
+                // Store detailed weather data for modal (locationName will be updated after reverse geocoding)
+                setDetailedWeatherData({
+                    ...basicData,
+                    feelsLike: Math.round(weather.app_temp || weather.temp),
+                    pressure: weather.pres || 0,
+                    visibility: weather.vis || 0,
+                    uvIndex: weather.uv || 0,
+                    dewPoint: Math.round(weather.dewpt || 0),
+                    windDirection: weather.wind_cdir || 'N',
+                    windDirectionFull: weather.wind_cdir_full || 'North',
+                    cloudCoverage: weather.clouds || 0,
+                    aqi: weather.aqi || null,
+                    cityName: locationName || weather.city_name || 'Current Location',
+                    countryCode: weather.country_code || '',
+                    timezone: weather.timezone || '',
+                    observationTime: weather.ob_time || new Date().toISOString(),
                 });
             }
         } catch (error) {
@@ -279,7 +332,11 @@ const FarmerHomeScreen = () => {
                     </View>
 
                     {/* Weather Card */}
-                    <View style={[dynamicStyles.weatherCard, { backgroundColor: colors.card }]}>
+                    <TouchableOpacity 
+                        style={[dynamicStyles.weatherCard, { backgroundColor: colors.card }]}
+                        onPress={() => setShowWeatherModal(true)}
+                        activeOpacity={0.8}
+                    >
                         {weatherLoading ? (
                             <View style={dynamicStyles.weatherLoadingContainer}>
                                 <ActivityIndicator size="large" color={colors.primary} />
@@ -358,7 +415,7 @@ const FarmerHomeScreen = () => {
                                 </View>
                             </>
                         )}
-                    </View>
+                    </TouchableOpacity>
 
                     {/* Commodities and Food Section */}
                     <View style={dynamicStyles.section}>
@@ -382,6 +439,218 @@ const FarmerHomeScreen = () => {
                     </View>
                 </View>
             </ScrollView>
+
+            {/* Weather Details Modal */}
+            <Modal
+                visible={showWeatherModal}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setShowWeatherModal(false)}
+            >
+                <View style={dynamicStyles.modalOverlay}>
+                    <View style={[dynamicStyles.modalContent, { backgroundColor: colors.card }]}>
+                        <View style={dynamicStyles.modalHeader}>
+                            <Text style={[dynamicStyles.modalTitle, { color: colors.text }]}>Weather Details</Text>
+                            <TouchableOpacity 
+                                onPress={() => setShowWeatherModal(false)}
+                                style={dynamicStyles.closeButton}
+                            >
+                                <Text style={[dynamicStyles.closeButtonText, { color: colors.text }]}>✕</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            {detailedWeatherData ? (
+                                <View style={dynamicStyles.modalBody}>
+                                    {/* Location */}
+                                    <View style={[dynamicStyles.detailSection, { borderBottomColor: colors.border }]}>
+                                        <Text style={dynamicStyles.detailIcon}>📍</Text>
+                                        <View style={dynamicStyles.detailContent}>
+                                            <Text style={[dynamicStyles.detailLabel, { color: colors.textSecondary }]}>Location</Text>
+                                            <Text style={[dynamicStyles.detailValue, { color: colors.text }]}>
+                                                {locationName || detailedWeatherData?.cityName || 'Current Location'}
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {/* Temperature */}
+                                    <View style={[dynamicStyles.detailSection, { borderBottomColor: colors.border }]}>
+                                        <Text style={dynamicStyles.detailIcon}>🌡️</Text>
+                                        <View style={dynamicStyles.detailContent}>
+                                            <Text style={[dynamicStyles.detailLabel, { color: colors.textSecondary }]}>Temperature</Text>
+                                            <Text style={[dynamicStyles.detailValue, { color: colors.text }]}>
+                                                {detailedWeatherData.temperature > 0 ? '+' : ''}{detailedWeatherData.temperature}°C
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {/* Feels Like */}
+                                    <View style={[dynamicStyles.detailSection, { borderBottomColor: colors.border }]}>
+                                        <Text style={dynamicStyles.detailIcon}>🤲</Text>
+                                        <View style={dynamicStyles.detailContent}>
+                                            <Text style={[dynamicStyles.detailLabel, { color: colors.textSecondary }]}>Feels Like</Text>
+                                            <Text style={[dynamicStyles.detailValue, { color: colors.text }]}>
+                                                {detailedWeatherData.feelsLike > 0 ? '+' : ''}{detailedWeatherData.feelsLike}°C
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {/* Weather Description */}
+                                    <View style={[dynamicStyles.detailSection, { borderBottomColor: colors.border }]}>
+                                        <Text style={dynamicStyles.detailIcon}>
+                                            {getWeatherIcon(detailedWeatherData.icon)}
+                                        </Text>
+                                        <View style={dynamicStyles.detailContent}>
+                                            <Text style={[dynamicStyles.detailLabel, { color: colors.textSecondary }]}>Condition</Text>
+                                            <Text style={[dynamicStyles.detailValue, { color: colors.text }]}>
+                                                {detailedWeatherData.description}
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {/* Humidity */}
+                                    <View style={[dynamicStyles.detailSection, { borderBottomColor: colors.border }]}>
+                                        <Text style={dynamicStyles.detailIcon}>💧</Text>
+                                        <View style={dynamicStyles.detailContent}>
+                                            <Text style={[dynamicStyles.detailLabel, { color: colors.textSecondary }]}>Humidity</Text>
+                                            <Text style={[dynamicStyles.detailValue, { color: colors.text }]}>
+                                                {detailedWeatherData.humidity}%
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {/* Wind */}
+                                    <View style={[dynamicStyles.detailSection, { borderBottomColor: colors.border }]}>
+                                        <Text style={dynamicStyles.detailIcon}>💨</Text>
+                                        <View style={dynamicStyles.detailContent}>
+                                            <Text style={[dynamicStyles.detailLabel, { color: colors.textSecondary }]}>Wind Speed</Text>
+                                            <Text style={[dynamicStyles.detailValue, { color: colors.text }]}>
+                                                {detailedWeatherData.windSpeed.toFixed(1)} m/s {detailedWeatherData.windDirection}
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {/* Wind Direction */}
+                                    <View style={[dynamicStyles.detailSection, { borderBottomColor: colors.border }]}>
+                                        <Text style={dynamicStyles.detailIcon}>🧭</Text>
+                                        <View style={dynamicStyles.detailContent}>
+                                            <Text style={[dynamicStyles.detailLabel, { color: colors.textSecondary }]}>Wind Direction</Text>
+                                            <Text style={[dynamicStyles.detailValue, { color: colors.text }]}>
+                                                {detailedWeatherData.windDirectionFull}
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {/* Pressure */}
+                                    <View style={[dynamicStyles.detailSection, { borderBottomColor: colors.border }]}>
+                                        <Text style={dynamicStyles.detailIcon}>📊</Text>
+                                        <View style={dynamicStyles.detailContent}>
+                                            <Text style={[dynamicStyles.detailLabel, { color: colors.textSecondary }]}>Pressure</Text>
+                                            <Text style={[dynamicStyles.detailValue, { color: colors.text }]}>
+                                                {detailedWeatherData.pressure.toFixed(1)} mb
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {/* Visibility */}
+                                    <View style={[dynamicStyles.detailSection, { borderBottomColor: colors.border }]}>
+                                        <Text style={dynamicStyles.detailIcon}>👁️</Text>
+                                        <View style={dynamicStyles.detailContent}>
+                                            <Text style={[dynamicStyles.detailLabel, { color: colors.textSecondary }]}>Visibility</Text>
+                                            <Text style={[dynamicStyles.detailValue, { color: colors.text }]}>
+                                                {detailedWeatherData.visibility.toFixed(1)} km
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {/* UV Index */}
+                                    <View style={[dynamicStyles.detailSection, { borderBottomColor: colors.border }]}>
+                                        <Text style={dynamicStyles.detailIcon}>☀️</Text>
+                                        <View style={dynamicStyles.detailContent}>
+                                            <Text style={[dynamicStyles.detailLabel, { color: colors.textSecondary }]}>UV Index</Text>
+                                            <Text style={[dynamicStyles.detailValue, { color: colors.text }]}>
+                                                {detailedWeatherData.uvIndex}
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {/* Dew Point */}
+                                    <View style={[dynamicStyles.detailSection, { borderBottomColor: colors.border }]}>
+                                        <Text style={dynamicStyles.detailIcon}>💎</Text>
+                                        <View style={dynamicStyles.detailContent}>
+                                            <Text style={[dynamicStyles.detailLabel, { color: colors.textSecondary }]}>Dew Point</Text>
+                                            <Text style={[dynamicStyles.detailValue, { color: colors.text }]}>
+                                                {detailedWeatherData.dewPoint > 0 ? '+' : ''}{detailedWeatherData.dewPoint}°C
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {/* Cloud Coverage */}
+                                    <View style={[dynamicStyles.detailSection, { borderBottomColor: colors.border }]}>
+                                        <Text style={dynamicStyles.detailIcon}>☁️</Text>
+                                        <View style={dynamicStyles.detailContent}>
+                                            <Text style={[dynamicStyles.detailLabel, { color: colors.textSecondary }]}>Cloud Coverage</Text>
+                                            <Text style={[dynamicStyles.detailValue, { color: colors.text }]}>
+                                                {detailedWeatherData.cloudCoverage}%
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {/* Precipitation */}
+                                    <View style={[dynamicStyles.detailSection, { borderBottomColor: colors.border }]}>
+                                        <Text style={dynamicStyles.detailIcon}>🌧️</Text>
+                                        <View style={dynamicStyles.detailContent}>
+                                            <Text style={[dynamicStyles.detailLabel, { color: colors.textSecondary }]}>Precipitation</Text>
+                                            <Text style={[dynamicStyles.detailValue, { color: colors.text }]}>
+                                                {detailedWeatherData.precipitation.toFixed(1)} mm
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {/* Soil Temperature */}
+                                    <View style={[dynamicStyles.detailSection, { borderBottomColor: colors.border }]}>
+                                        <Text style={dynamicStyles.detailIcon}>🌱</Text>
+                                        <View style={dynamicStyles.detailContent}>
+                                            <Text style={[dynamicStyles.detailLabel, { color: colors.textSecondary }]}>Soil Temperature</Text>
+                                            <Text style={[dynamicStyles.detailValue, { color: colors.text }]}>
+                                                +{detailedWeatherData.soilTemp}°C
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {/* Sunrise */}
+                                    <View style={[dynamicStyles.detailSection, { borderBottomColor: colors.border }]}>
+                                        <Text style={dynamicStyles.detailIcon}>🌅</Text>
+                                        <View style={dynamicStyles.detailContent}>
+                                            <Text style={[dynamicStyles.detailLabel, { color: colors.textSecondary }]}>Sunrise</Text>
+                                            <Text style={[dynamicStyles.detailValue, { color: colors.text }]}>
+                                                {formatTime(detailedWeatherData.sunrise)}
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {/* Sunset */}
+                                    <View style={[dynamicStyles.detailSection, { borderBottomColor: colors.border }]}>
+                                        <Text style={dynamicStyles.detailIcon}>🌇</Text>
+                                        <View style={dynamicStyles.detailContent}>
+                                            <Text style={[dynamicStyles.detailLabel, { color: colors.textSecondary }]}>Sunset</Text>
+                                            <Text style={[dynamicStyles.detailValue, { color: colors.text }]}>
+                                                {formatTime(detailedWeatherData.sunset)}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                </View>
+                            ) : (
+                                <View style={dynamicStyles.modalBody}>
+                                    <Text style={[dynamicStyles.noDataText, { color: colors.textSecondary }]}>
+                                        Weather data not available
+                                    </Text>
+                                </View>
+                            )}
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 };
@@ -620,6 +889,78 @@ const getStyles = (colors, isDark) => StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
         color: colors.text,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'flex-end',
+    },
+    modalContent: {
+        backgroundColor: colors.card,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        maxHeight: '90%',
+        paddingBottom: 20,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+    },
+    modalTitle: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: colors.text,
+    },
+    closeButton: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: colors.surface,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    closeButtonText: {
+        fontSize: 20,
+        fontWeight: '600',
+        color: colors.text,
+    },
+    modalBody: {
+        padding: 20,
+    },
+    detailSection: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+    },
+    detailIcon: {
+        fontSize: 24,
+        marginRight: 16,
+        width: 32,
+    },
+    detailContent: {
+        flex: 1,
+    },
+    detailLabel: {
+        fontSize: 12,
+        color: colors.textSecondary,
+        marginBottom: 4,
+    },
+    detailValue: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: colors.text,
+    },
+    noDataText: {
+        fontSize: 16,
+        textAlign: 'center',
+        padding: 40,
+        color: colors.textSecondary,
     },
 });
 
