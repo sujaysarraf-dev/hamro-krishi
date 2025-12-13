@@ -2,13 +2,19 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useTheme } from '../../context/ThemeContext';
 import SweetAlert from '../../components/SweetAlert';
 
 const SettingsScreen = () => {
     const router = useRouter();
+    const { theme, isDark, colors, setTheme } = useTheme();
     const [notifications, setNotifications] = useState(true);
     const [emailUpdates, setEmailUpdates] = useState(false);
     const [alert, setAlert] = useState({ visible: false, type: 'info', title: '', message: '' });
+
+    const handleThemeChange = (newTheme) => {
+        setTheme(newTheme);
+    };
 
     const handleAbout = () => {
         setAlert({
@@ -37,66 +43,111 @@ const SettingsScreen = () => {
         });
     };
 
+    const dynamicStyles = getStyles(colors, isDark);
+
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <Text style={styles.backButtonText}>← Back</Text>
+        <SafeAreaView style={[dynamicStyles.container, { backgroundColor: colors.background }]}>
+            <View style={[dynamicStyles.header, { borderBottomColor: colors.border }]}>
+                <TouchableOpacity onPress={() => router.back()} style={dynamicStyles.backButton}>
+                    <Text style={[dynamicStyles.backButtonText, { color: colors.primary }]}>← Back</Text>
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Settings</Text>
-                <View style={styles.placeholder} />
+                <Text style={[dynamicStyles.headerTitle, { color: colors.text }]}>Settings</Text>
+                <View style={dynamicStyles.placeholder} />
             </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollView}>
-                <View style={styles.content}>
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Notifications</Text>
+            <ScrollView showsVerticalScrollIndicator={false} style={dynamicStyles.scrollView}>
+                <View style={dynamicStyles.content}>
+                    <View style={dynamicStyles.section}>
+                        <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>Appearance</Text>
                         
-                        <View style={styles.settingItem}>
-                            <View style={styles.settingInfo}>
-                                <Text style={styles.settingLabel}>Push Notifications</Text>
-                                <Text style={styles.settingDescription}>Receive push notifications</Text>
+                        <View style={[dynamicStyles.settingItem, { borderBottomColor: colors.border }]}>
+                            <View style={dynamicStyles.settingInfo}>
+                                <Text style={[dynamicStyles.settingLabel, { color: colors.text }]}>Theme</Text>
+                                <Text style={[dynamicStyles.settingDescription, { color: colors.textSecondary }]}>
+                                    {theme === 'system' ? 'System default' : theme === 'dark' ? 'Dark mode' : 'Light mode'}
+                                </Text>
+                            </View>
+                        </View>
+
+                        <TouchableOpacity 
+                            style={[dynamicStyles.themeOption, { borderBottomColor: colors.border }]}
+                            onPress={() => handleThemeChange('light')}
+                        >
+                            <View style={dynamicStyles.themeOptionContent}>
+                                <Text style={[dynamicStyles.themeOptionText, { color: colors.text }]}>☀️ Light</Text>
+                                {theme === 'light' && <Text style={[dynamicStyles.checkmark, { color: colors.primary }]}>✓</Text>}
+                            </View>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            style={[dynamicStyles.themeOption, { borderBottomColor: colors.border }]}
+                            onPress={() => handleThemeChange('dark')}
+                        >
+                            <View style={dynamicStyles.themeOptionContent}>
+                                <Text style={[dynamicStyles.themeOptionText, { color: colors.text }]}>🌙 Dark</Text>
+                                {theme === 'dark' && <Text style={[dynamicStyles.checkmark, { color: colors.primary }]}>✓</Text>}
+                            </View>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            style={[dynamicStyles.themeOption, { borderBottomColor: colors.border }]}
+                            onPress={() => handleThemeChange('system')}
+                        >
+                            <View style={dynamicStyles.themeOptionContent}>
+                                <Text style={[dynamicStyles.themeOptionText, { color: colors.text }]}>⚙️ System</Text>
+                                {theme === 'system' && <Text style={[dynamicStyles.checkmark, { color: colors.primary }]}>✓</Text>}
+                            </View>
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={dynamicStyles.section}>
+                        <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>Notifications</Text>
+                        
+                        <View style={[dynamicStyles.settingItem, { borderBottomColor: colors.border }]}>
+                            <View style={dynamicStyles.settingInfo}>
+                                <Text style={[dynamicStyles.settingLabel, { color: colors.text }]}>Push Notifications</Text>
+                                <Text style={[dynamicStyles.settingDescription, { color: colors.textSecondary }]}>Receive push notifications</Text>
                             </View>
                             <Switch
                                 value={notifications}
                                 onValueChange={setNotifications}
-                                trackColor={{ false: '#E0E0E0', true: '#228B22' }}
+                                trackColor={{ false: colors.border, true: colors.primary }}
                                 thumbColor="#FFFFFF"
                             />
                         </View>
 
-                        <View style={styles.settingItem}>
-                            <View style={styles.settingInfo}>
-                                <Text style={styles.settingLabel}>Email Updates</Text>
-                                <Text style={styles.settingDescription}>Receive email updates</Text>
+                        <View style={[dynamicStyles.settingItem, { borderBottomColor: colors.border }]}>
+                            <View style={dynamicStyles.settingInfo}>
+                                <Text style={[dynamicStyles.settingLabel, { color: colors.text }]}>Email Updates</Text>
+                                <Text style={[dynamicStyles.settingDescription, { color: colors.textSecondary }]}>Receive email updates</Text>
                             </View>
                             <Switch
                                 value={emailUpdates}
                                 onValueChange={setEmailUpdates}
-                                trackColor={{ false: '#E0E0E0', true: '#228B22' }}
+                                trackColor={{ false: colors.border, true: colors.primary }}
                                 thumbColor="#FFFFFF"
                             />
                         </View>
                     </View>
 
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>About</Text>
+                    <View style={dynamicStyles.section}>
+                        <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>About</Text>
                         
-                        <TouchableOpacity style={styles.menuItem} onPress={handleAbout}>
-                            <Text style={styles.menuIcon}>ℹ️</Text>
-                            <Text style={styles.menuText}>About</Text>
-                            <Text style={styles.menuArrow}>›</Text>
+                        <TouchableOpacity style={[dynamicStyles.menuItem, { borderBottomColor: colors.border }]} onPress={handleAbout}>
+                            <Text style={dynamicStyles.menuIcon}>ℹ️</Text>
+                            <Text style={[dynamicStyles.menuText, { color: colors.text }]}>About</Text>
+                            <Text style={[dynamicStyles.menuArrow, { color: colors.textSecondary }]}>›</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={styles.menuItem} onPress={handlePrivacy}>
-                            <Text style={styles.menuIcon}>🔒</Text>
-                            <Text style={styles.menuText}>Privacy Policy</Text>
-                            <Text style={styles.menuArrow}>›</Text>
+                        <TouchableOpacity style={[dynamicStyles.menuItem, { borderBottomColor: colors.border }]} onPress={handlePrivacy}>
+                            <Text style={dynamicStyles.menuIcon}>🔒</Text>
+                            <Text style={[dynamicStyles.menuText, { color: colors.text }]}>Privacy Policy</Text>
+                            <Text style={[dynamicStyles.menuArrow, { color: colors.textSecondary }]}>›</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={styles.menuItem} onPress={handleTerms}>
-                            <Text style={styles.menuIcon}>📄</Text>
-                            <Text style={styles.menuText}>Terms of Service</Text>
-                            <Text style={styles.menuArrow}>›</Text>
+                        <TouchableOpacity style={[dynamicStyles.menuItem, { borderBottomColor: colors.border }]} onPress={handleTerms}>
+                            <Text style={dynamicStyles.menuIcon}>📄</Text>
+                            <Text style={[dynamicStyles.menuText, { color: colors.text }]}>Terms of Service</Text>
+                            <Text style={[dynamicStyles.menuArrow, { color: colors.textSecondary }]}>›</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -112,10 +163,10 @@ const SettingsScreen = () => {
     );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors, isDark) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
     },
     header: {
         flexDirection: 'row',
@@ -125,20 +176,21 @@ const styles = StyleSheet.create({
         paddingTop: 20,
         paddingBottom: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
+        borderBottomColor: colors.border,
+        backgroundColor: colors.header,
     },
     backButton: {
         padding: 8,
     },
     backButtonText: {
         fontSize: 16,
-        color: '#228B22',
+        color: colors.primary,
         fontWeight: '600',
     },
     headerTitle: {
         fontSize: 20,
         fontWeight: '700',
-        color: '#1F1F1F',
+        color: colors.text,
     },
     placeholder: {
         width: 60,
@@ -155,7 +207,7 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#1F1F1F',
+        color: colors.text,
         marginBottom: 16,
     },
     settingItem: {
@@ -164,7 +216,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
+        borderBottomColor: colors.border,
     },
     settingInfo: {
         flex: 1,
@@ -173,19 +225,38 @@ const styles = StyleSheet.create({
     settingLabel: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#1F1F1F',
+        color: colors.text,
         marginBottom: 4,
     },
     settingDescription: {
         fontSize: 12,
-        color: '#666666',
+        color: colors.textSecondary,
+    },
+    themeOption: {
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+    },
+    themeOptionContent: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    themeOptionText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: colors.text,
+    },
+    checkmark: {
+        fontSize: 20,
+        fontWeight: 'bold',
     },
     menuItem: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingVertical: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
+        borderBottomColor: colors.border,
     },
     menuIcon: {
         fontSize: 24,
@@ -195,11 +266,11 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: 16,
         fontWeight: '600',
-        color: '#1F1F1F',
+        color: colors.text,
     },
     menuArrow: {
         fontSize: 24,
-        color: '#666666',
+        color: colors.textSecondary,
     },
 });
 

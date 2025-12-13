@@ -4,11 +4,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
+import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../config/supabase';
 import SweetAlert from '../../components/SweetAlert';
 
 const EditProfileScreen = () => {
     const router = useRouter();
+    const { colors, isDark } = useTheme();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [uploading, setUploading] = useState(false);
@@ -278,99 +280,101 @@ const EditProfileScreen = () => {
         }
     };
 
+    const dynamicStyles = getStyles(colors, isDark);
+
     if (loading) {
         return (
-            <SafeAreaView style={styles.container}>
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color="#228B22" />
+            <SafeAreaView style={[dynamicStyles.container, { backgroundColor: colors.background }]}>
+                <View style={dynamicStyles.loadingContainer}>
+                    <ActivityIndicator size="large" color={colors.primary} />
                 </View>
             </SafeAreaView>
         );
     }
 
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <Text style={styles.backButtonText}>← Back</Text>
+        <SafeAreaView style={[dynamicStyles.container, { backgroundColor: colors.background }]}>
+            <View style={[dynamicStyles.header, { borderBottomColor: colors.border }]}>
+                <TouchableOpacity onPress={() => router.back()} style={dynamicStyles.backButton}>
+                    <Text style={[dynamicStyles.backButtonText, { color: colors.primary }]}>← Back</Text>
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Edit Profile</Text>
-                <View style={styles.placeholder} />
+                <Text style={[dynamicStyles.headerTitle, { color: colors.text }]}>Edit Profile</Text>
+                <View style={dynamicStyles.placeholder} />
             </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollView}>
-                <View style={styles.content}>
+            <ScrollView showsVerticalScrollIndicator={false} style={dynamicStyles.scrollView}>
+                <View style={dynamicStyles.content}>
                     {/* Profile Photo Section */}
-                    <View style={styles.formGroup}>
-                        <Text style={styles.label}>Profile Photo</Text>
-                        <View style={styles.avatarSection}>
-                            <View style={styles.avatarContainer}>
+                    <View style={dynamicStyles.formGroup}>
+                        <Text style={[dynamicStyles.label, { color: colors.text }]}>Profile Photo</Text>
+                        <View style={dynamicStyles.avatarSection}>
+                            <View style={[dynamicStyles.avatarContainer, { backgroundColor: colors.primary }]}>
                                 {localImage ? (
-                                    <Image source={{ uri: localImage }} style={styles.avatarImage} />
+                                    <Image source={{ uri: localImage }} style={dynamicStyles.avatarImage} />
                                 ) : avatarUrl ? (
-                                    <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+                                    <Image source={{ uri: avatarUrl }} style={dynamicStyles.avatarImage} />
                                 ) : (
-                                    <Text style={styles.avatarPlaceholder}>
+                                    <Text style={dynamicStyles.avatarPlaceholder}>
                                         {fullName ? fullName.charAt(0).toUpperCase() : 'U'}
                                     </Text>
                                 )}
                             </View>
                             <TouchableOpacity 
-                                style={styles.uploadButton}
+                                style={[dynamicStyles.uploadButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
                                 onPress={pickImage}
                                 disabled={uploading}
                             >
                                 {uploading ? (
-                                    <ActivityIndicator color="#228B22" size="small" />
+                                    <ActivityIndicator color={colors.primary} size="small" />
                                 ) : (
-                                    <Text style={styles.uploadButtonText}>Upload Photo</Text>
+                                    <Text style={[dynamicStyles.uploadButtonText, { color: colors.primary }]}>Upload Photo</Text>
                                 )}
                             </TouchableOpacity>
                         </View>
                     </View>
 
-                    <View style={styles.formGroup}>
-                        <Text style={styles.label}>Full Name</Text>
+                    <View style={dynamicStyles.formGroup}>
+                        <Text style={[dynamicStyles.label, { color: colors.text }]}>Full Name</Text>
                         <TextInput
-                            style={styles.input}
+                            style={[dynamicStyles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
                             value={fullName}
                             onChangeText={setFullName}
                             placeholder="Enter your full name"
-                            placeholderTextColor="#999"
+                            placeholderTextColor={colors.textSecondary}
                         />
                     </View>
 
-                    <View style={styles.formGroup}>
-                        <Text style={styles.label}>Email</Text>
+                    <View style={dynamicStyles.formGroup}>
+                        <Text style={[dynamicStyles.label, { color: colors.text }]}>Email</Text>
                         <TextInput
-                            style={[styles.input, styles.inputDisabled]}
+                            style={[dynamicStyles.input, dynamicStyles.inputDisabled, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.textSecondary }]}
                             value={email}
                             editable={false}
-                            placeholderTextColor="#999"
+                            placeholderTextColor={colors.textSecondary}
                         />
-                        <Text style={styles.helperText}>Email cannot be changed</Text>
+                        <Text style={[dynamicStyles.helperText, { color: colors.textSecondary }]}>Email cannot be changed</Text>
                     </View>
 
-                    <View style={styles.formGroup}>
-                        <Text style={styles.label}>Phone</Text>
+                    <View style={dynamicStyles.formGroup}>
+                        <Text style={[dynamicStyles.label, { color: colors.text }]}>Phone</Text>
                         <TextInput
-                            style={styles.input}
+                            style={[dynamicStyles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
                             value={phone}
                             onChangeText={setPhone}
                             placeholder="Enter your phone number"
-                            placeholderTextColor="#999"
+                            placeholderTextColor={colors.textSecondary}
                             keyboardType="phone-pad"
                         />
                     </View>
 
                     <TouchableOpacity
-                        style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+                        style={[dynamicStyles.saveButton, { backgroundColor: colors.primary }, saving && dynamicStyles.saveButtonDisabled]}
                         onPress={handleSave}
                         disabled={saving}
                     >
                         {saving ? (
                             <ActivityIndicator color="#FFFFFF" />
                         ) : (
-                            <Text style={styles.saveButtonText}>Save Changes</Text>
+                            <Text style={dynamicStyles.saveButtonText}>Save Changes</Text>
                         )}
                     </TouchableOpacity>
                 </View>
@@ -389,10 +393,10 @@ const EditProfileScreen = () => {
     );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors, isDark) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
     },
     loadingContainer: {
         flex: 1,
@@ -407,20 +411,21 @@ const styles = StyleSheet.create({
         paddingTop: 20,
         paddingBottom: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
+        borderBottomColor: colors.border,
+        backgroundColor: colors.header,
     },
     backButton: {
         padding: 8,
     },
     backButtonText: {
         fontSize: 16,
-        color: '#228B22',
+        color: colors.primary,
         fontWeight: '600',
     },
     headerTitle: {
         fontSize: 20,
         fontWeight: '700',
-        color: '#1F1F1F',
+        color: colors.text,
     },
     placeholder: {
         width: 60,
@@ -437,29 +442,29 @@ const styles = StyleSheet.create({
     label: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#1F1F1F',
+        color: colors.text,
         marginBottom: 8,
     },
     input: {
         borderWidth: 1,
-        borderColor: '#E0E0E0',
+        borderColor: colors.border,
         borderRadius: 12,
         padding: 16,
         fontSize: 16,
-        color: '#1F1F1F',
-        backgroundColor: '#FFFFFF',
+        color: colors.text,
+        backgroundColor: colors.background,
     },
     inputDisabled: {
-        backgroundColor: '#F5F5F5',
-        color: '#666666',
+        backgroundColor: colors.surface,
+        color: colors.textSecondary,
     },
     helperText: {
         fontSize: 12,
-        color: '#666666',
+        color: colors.textSecondary,
         marginTop: 4,
     },
     saveButton: {
-        backgroundColor: '#228B22',
+        backgroundColor: colors.primary,
         paddingVertical: 16,
         borderRadius: 12,
         justifyContent: 'center',
@@ -482,7 +487,7 @@ const styles = StyleSheet.create({
         width: 120,
         height: 120,
         borderRadius: 60,
-        backgroundColor: '#228B22',
+        backgroundColor: colors.primary,
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 16,
@@ -498,15 +503,15 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
     },
     uploadButton: {
-        backgroundColor: '#F5F5F5',
+        backgroundColor: colors.surface,
         paddingVertical: 12,
         paddingHorizontal: 24,
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#E0E0E0',
+        borderColor: colors.border,
     },
     uploadButtonText: {
-        color: '#228B22',
+        color: colors.primary,
         fontSize: 14,
         fontWeight: '600',
     },

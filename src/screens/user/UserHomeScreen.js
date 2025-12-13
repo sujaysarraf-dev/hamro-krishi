@@ -1,44 +1,48 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
 const UserHomeScreen = () => {
+    const { colors, isDark } = useTheme();
+    const dynamicStyles = getStyles(colors, isDark);
+
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[dynamicStyles.container, { backgroundColor: colors.background }]}>
             <ScrollView showsVerticalScrollIndicator={false}>
-                <View style={styles.content}>
-                    <Text style={styles.title}>Welcome Back!</Text>
-                    <Text style={styles.subtitle}>Discover fresh produce from local farmers</Text>
+                <View style={dynamicStyles.content}>
+                    <Text style={[dynamicStyles.title, { color: colors.text }]}>Welcome Back!</Text>
+                    <Text style={[dynamicStyles.subtitle, { color: colors.textSecondary }]}>Discover fresh produce from local farmers</Text>
                     
                     {/* Quick Stats */}
-                    <View style={styles.statsContainer}>
-                        <View style={styles.statCard}>
-                            <Text style={styles.statNumber}>50+</Text>
-                            <Text style={styles.statLabel}>Products</Text>
+                    <View style={dynamicStyles.statsContainer}>
+                        <View style={[dynamicStyles.statCard, { backgroundColor: isDark ? colors.surface : '#F0FFF4' }]}>
+                            <Text style={[dynamicStyles.statNumber, { color: colors.primary }]}>50+</Text>
+                            <Text style={[dynamicStyles.statLabel, { color: colors.textSecondary }]}>Products</Text>
                         </View>
-                        <View style={styles.statCard}>
-                            <Text style={styles.statNumber}>20+</Text>
-                            <Text style={styles.statLabel}>Farmers</Text>
+                        <View style={[dynamicStyles.statCard, { backgroundColor: isDark ? colors.surface : '#F0FFF4' }]}>
+                            <Text style={[dynamicStyles.statNumber, { color: colors.primary }]}>20+</Text>
+                            <Text style={[dynamicStyles.statLabel, { color: colors.textSecondary }]}>Farmers</Text>
                         </View>
-                        <View style={styles.statCard}>
-                            <Text style={styles.statNumber}>100+</Text>
-                            <Text style={styles.statLabel}>Orders</Text>
+                        <View style={[dynamicStyles.statCard, { backgroundColor: isDark ? colors.surface : '#F0FFF4' }]}>
+                            <Text style={[dynamicStyles.statNumber, { color: colors.primary }]}>100+</Text>
+                            <Text style={[dynamicStyles.statLabel, { color: colors.textSecondary }]}>Orders</Text>
                         </View>
                     </View>
 
                     {/* Featured Section */}
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Featured Products</Text>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
+                    <View style={dynamicStyles.section}>
+                        <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>Featured Products</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={dynamicStyles.horizontalScroll}>
                             {[1, 2, 3].map((item) => (
-                                <View key={item} style={styles.productCard}>
-                                    <View style={styles.productImagePlaceholder}>
-                                        <Text style={styles.placeholderText}>🌾</Text>
+                                <View key={item} style={[dynamicStyles.productCard, { backgroundColor: colors.surface }]}>
+                                    <View style={[dynamicStyles.productImagePlaceholder, { backgroundColor: colors.border }]}>
+                                        <Text style={dynamicStyles.placeholderText}>🌾</Text>
                                     </View>
-                                    <Text style={styles.productName}>Fresh Rice</Text>
-                                    <Text style={styles.productPrice}>Rp 1,300,000</Text>
+                                    <Text style={[dynamicStyles.productName, { color: colors.text }]}>Fresh Rice</Text>
+                                    <Text style={[dynamicStyles.productPrice, { color: colors.primary }]}>Rp 1,300,000</Text>
                                 </View>
                             ))}
                         </ScrollView>
@@ -49,10 +53,10 @@ const UserHomeScreen = () => {
     );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors, isDark) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
     },
     content: {
         padding: 20,
@@ -60,12 +64,12 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 28,
         fontWeight: '700',
-        color: '#1F1F1F',
+        color: colors.text,
         marginBottom: 8,
     },
     subtitle: {
         fontSize: 16,
-        color: '#666666',
+        color: colors.textSecondary,
         marginBottom: 24,
     },
     statsContainer: {
@@ -75,7 +79,7 @@ const styles = StyleSheet.create({
     },
     statCard: {
         flex: 1,
-        backgroundColor: '#F0FFF4',
+        backgroundColor: colors.surface,
         borderRadius: 12,
         padding: 16,
         marginHorizontal: 4,
@@ -84,12 +88,12 @@ const styles = StyleSheet.create({
     statNumber: {
         fontSize: 24,
         fontWeight: '700',
-        color: '#228B22',
+        color: colors.primary,
         marginBottom: 4,
     },
     statLabel: {
         fontSize: 12,
-        color: '#666666',
+        color: colors.textSecondary,
     },
     section: {
         marginBottom: 24,
@@ -97,7 +101,7 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 20,
         fontWeight: '700',
-        color: '#1F1F1F',
+        color: colors.text,
         marginBottom: 16,
     },
     horizontalScroll: {
@@ -107,14 +111,14 @@ const styles = StyleSheet.create({
     productCard: {
         width: 150,
         marginRight: 16,
-        backgroundColor: '#F5F5F5',
+        backgroundColor: colors.surface,
         borderRadius: 12,
         padding: 12,
     },
     productImagePlaceholder: {
         width: '100%',
         height: 120,
-        backgroundColor: '#E0E0E0',
+        backgroundColor: colors.border,
         borderRadius: 8,
         justifyContent: 'center',
         alignItems: 'center',
@@ -126,13 +130,13 @@ const styles = StyleSheet.create({
     productName: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#1F1F1F',
+        color: colors.text,
         marginBottom: 4,
     },
     productPrice: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#228B22',
+        color: colors.primary,
     },
 });
 

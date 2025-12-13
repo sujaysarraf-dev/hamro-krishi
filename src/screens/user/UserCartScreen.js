@@ -1,11 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../../context/ThemeContext';
 import SweetAlert from '../../components/SweetAlert';
 
 const { width } = Dimensions.get('window');
 
 const UserCartScreen = () => {
+    const { colors, isDark } = useTheme();
     const [cartItems, setCartItems] = useState([
         {
             id: 1,
@@ -89,69 +91,71 @@ const UserCartScreen = () => {
         });
     };
 
+    const dynamicStyles = getStyles(colors, isDark);
+
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>Cart</Text>
+        <SafeAreaView style={[dynamicStyles.container, { backgroundColor: colors.background }]}>
+            <View style={[dynamicStyles.header, { borderBottomColor: colors.border }]}>
+                <Text style={[dynamicStyles.headerTitle, { color: colors.text }]}>Cart</Text>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollView}>
-                <View style={styles.content}>
+            <ScrollView showsVerticalScrollIndicator={false} style={dynamicStyles.scrollView}>
+                <View style={dynamicStyles.content}>
                     {cartItems.length === 0 ? (
-                        <View style={styles.emptyContainer}>
-                            <Text style={styles.emptyIcon}>🛒</Text>
-                            <Text style={styles.emptyText}>Your cart is empty</Text>
-                            <Text style={styles.emptySubtext}>Start shopping to add items</Text>
+                        <View style={dynamicStyles.emptyContainer}>
+                            <Text style={dynamicStyles.emptyIcon}>🛒</Text>
+                            <Text style={[dynamicStyles.emptyText, { color: colors.text }]}>Your cart is empty</Text>
+                            <Text style={[dynamicStyles.emptySubtext, { color: colors.textSecondary }]}>Start shopping to add items</Text>
                         </View>
                     ) : (
                         <>
                             {cartItems.map((item) => (
-                                <View key={item.id} style={styles.cartItem}>
-                                    <View style={styles.itemImageContainer}>
-                                        <Text style={styles.itemEmoji}>{item.image}</Text>
+                                <View key={item.id} style={[dynamicStyles.cartItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                                    <View style={[dynamicStyles.itemImageContainer, { backgroundColor: colors.border }]}>
+                                        <Text style={dynamicStyles.itemEmoji}>{item.image}</Text>
                                     </View>
-                                    <View style={styles.itemDetails}>
-                                        <Text style={styles.itemName}>{item.name}</Text>
-                                        <Text style={styles.itemStore}>{item.store}</Text>
-                                        <Text style={styles.itemPrice}>{item.priceDisplay}</Text>
-                                        <View style={styles.quantityContainer}>
+                                    <View style={dynamicStyles.itemDetails}>
+                                        <Text style={[dynamicStyles.itemName, { color: colors.text }]}>{item.name}</Text>
+                                        <Text style={[dynamicStyles.itemStore, { color: colors.textSecondary }]}>{item.store}</Text>
+                                        <Text style={[dynamicStyles.itemPrice, { color: colors.primary }]}>{item.priceDisplay}</Text>
+                                        <View style={dynamicStyles.quantityContainer}>
                                             <TouchableOpacity 
-                                                style={styles.quantityButton}
+                                                style={[dynamicStyles.quantityButton, { backgroundColor: colors.border }]}
                                                 onPress={() => decreaseQuantity(item.id)}
                                             >
-                                                <Text style={styles.quantityButtonText}>-</Text>
+                                                <Text style={[dynamicStyles.quantityButtonText, { color: colors.text }]}>-</Text>
                                             </TouchableOpacity>
-                                            <Text style={styles.quantityText}>{item.quantity}</Text>
+                                            <Text style={[dynamicStyles.quantityText, { color: colors.text }]}>{item.quantity}</Text>
                                             <TouchableOpacity 
-                                                style={styles.quantityButton}
+                                                style={[dynamicStyles.quantityButton, { backgroundColor: colors.border }]}
                                                 onPress={() => increaseQuantity(item.id)}
                                             >
-                                                <Text style={styles.quantityButtonText}>+</Text>
+                                                <Text style={[dynamicStyles.quantityButtonText, { color: colors.text }]}>+</Text>
                                             </TouchableOpacity>
                                         </View>
                                     </View>
                                     <TouchableOpacity 
-                                        style={styles.deleteButton}
+                                        style={dynamicStyles.deleteButton}
                                         onPress={() => deleteItem(item.id)}
                                     >
-                                        <Text style={styles.deleteIcon}>🗑️</Text>
+                                        <Text style={dynamicStyles.deleteIcon}>🗑️</Text>
                                     </TouchableOpacity>
                                 </View>
                             ))}
-                            <View style={styles.totalContainer}>
-                                <Text style={styles.totalLabel}>Total:</Text>
-                                <Text style={styles.totalAmount}>{formatPrice(total)}</Text>
+                            <View style={[dynamicStyles.totalContainer, { borderTopColor: colors.border }]}>
+                                <Text style={[dynamicStyles.totalLabel, { color: colors.text }]}>Total:</Text>
+                                <Text style={[dynamicStyles.totalAmount, { color: colors.primary }]}>{formatPrice(total)}</Text>
                             </View>
                         </>
                     )}
                 </View>
             </ScrollView>
             {cartItems.length > 0 && (
-                <View style={styles.checkoutContainer}>
+                <View style={[dynamicStyles.checkoutContainer, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
                     <TouchableOpacity 
-                        style={styles.checkoutButton}
+                        style={[dynamicStyles.checkoutButton, { backgroundColor: colors.primary }]}
                         onPress={handleCheckout}
                     >
-                        <Text style={styles.checkoutButtonText}>Checkout</Text>
+                        <Text style={dynamicStyles.checkoutButtonText}>Checkout</Text>
                     </TouchableOpacity>
                 </View>
             )}
@@ -171,22 +175,23 @@ const UserCartScreen = () => {
     );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors, isDark) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
     },
     header: {
         paddingHorizontal: 20,
         paddingTop: 20,
         paddingBottom: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
+        borderBottomColor: colors.border,
+        backgroundColor: colors.header,
     },
     headerTitle: {
         fontSize: 28,
         fontWeight: '700',
-        color: '#1F1F1F',
+        color: colors.text,
     },
     scrollView: {
         flex: 1,
@@ -207,24 +212,26 @@ const styles = StyleSheet.create({
     emptyText: {
         fontSize: 20,
         fontWeight: '600',
-        color: '#1F1F1F',
+        color: colors.text,
         marginBottom: 8,
     },
     emptySubtext: {
         fontSize: 14,
-        color: '#666666',
+        color: colors.textSecondary,
     },
     cartItem: {
         flexDirection: 'row',
-        backgroundColor: '#F5F5F5',
+        backgroundColor: colors.surface,
         borderRadius: 12,
         padding: 12,
         marginBottom: 16,
+        borderWidth: 1,
+        borderColor: colors.border,
     },
     itemImageContainer: {
         width: 80,
         height: 80,
-        backgroundColor: '#E0E0E0',
+        backgroundColor: colors.border,
         borderRadius: 8,
         justifyContent: 'center',
         alignItems: 'center',
@@ -239,18 +246,18 @@ const styles = StyleSheet.create({
     itemName: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#1F1F1F',
+        color: colors.text,
         marginBottom: 4,
     },
     itemStore: {
         fontSize: 12,
-        color: '#666666',
+        color: colors.textSecondary,
         marginBottom: 4,
     },
     itemPrice: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#228B22',
+        color: colors.primary,
         marginBottom: 8,
     },
     quantityContainer: {
@@ -260,22 +267,22 @@ const styles = StyleSheet.create({
     quantityButton: {
         width: 32,
         height: 32,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.border,
         borderRadius: 8,
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#E0E0E0',
+        borderColor: colors.border,
     },
     quantityButtonText: {
         fontSize: 18,
         fontWeight: '600',
-        color: '#228B22',
+        color: colors.text,
     },
     quantityText: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#1F1F1F',
+        color: colors.text,
         marginHorizontal: 16,
         minWidth: 30,
         textAlign: 'center',
@@ -292,27 +299,27 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingTop: 16,
         borderTopWidth: 1,
-        borderTopColor: '#E0E0E0',
+        borderTopColor: colors.border,
         marginTop: 8,
     },
     totalLabel: {
         fontSize: 20,
         fontWeight: '600',
-        color: '#1F1F1F',
+        color: colors.text,
     },
     totalAmount: {
         fontSize: 24,
         fontWeight: '700',
-        color: '#228B22',
+        color: colors.primary,
     },
     checkoutContainer: {
         padding: 20,
         borderTopWidth: 1,
-        borderTopColor: '#F0F0F0',
-        backgroundColor: '#FFFFFF',
+        borderTopColor: colors.border,
+        backgroundColor: colors.card,
     },
     checkoutButton: {
-        backgroundColor: '#228B22',
+        backgroundColor: colors.primary,
         paddingVertical: 16,
         borderRadius: 12,
         justifyContent: 'center',

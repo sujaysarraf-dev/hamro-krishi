@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../../context/ThemeContext';
 import UserHomeScreen from './UserHomeScreen';
 import UserShopScreen from './UserShopScreen';
 import UserCartScreen from './UserCartScreen';
 import UserProfileScreen from './UserProfileScreen';
 
 const UserDashboardScreen = () => {
+    const { colors, isDark } = useTheme();
     const [activeTab, setActiveTab] = useState('home');
 
     const renderScreen = () => {
@@ -24,43 +26,45 @@ const UserDashboardScreen = () => {
         }
     };
 
+    const dynamicStyles = getStyles(colors, isDark);
+
     return (
-        <SafeAreaView style={styles.container} edges={['top']}>
-            <View style={styles.content}>
+        <SafeAreaView style={[dynamicStyles.container, { backgroundColor: colors.background }]} edges={['top']}>
+            <View style={dynamicStyles.content}>
                 {renderScreen()}
             </View>
-            <View style={styles.bottomNav}>
-                <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('home')}>
-                    <View style={styles.navIconContainer}>
-                        <Text style={styles.navIcon}>
+            <View style={[dynamicStyles.bottomNav, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
+                <TouchableOpacity style={dynamicStyles.navItem} onPress={() => setActiveTab('home')}>
+                    <View style={dynamicStyles.navIconContainer}>
+                        <Text style={[dynamicStyles.navIcon, { opacity: activeTab === 'home' ? 1 : 0.6 }]}>
                             {activeTab === 'home' ? '🏠' : '🏡'}
                         </Text>
                     </View>
-                    <Text style={[styles.navLabel, activeTab === 'home' && styles.navLabelActive]}>
+                    <Text style={[dynamicStyles.navLabel, activeTab === 'home' && { color: colors.primary, fontWeight: '600' }]}>
                         Home
                     </Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('shop')}>
-                    <View style={styles.navIconContainer}>
-                        <Text style={styles.navIcon}>🛍️</Text>
+                <TouchableOpacity style={dynamicStyles.navItem} onPress={() => setActiveTab('shop')}>
+                    <View style={dynamicStyles.navIconContainer}>
+                        <Text style={[dynamicStyles.navIcon, { opacity: activeTab === 'shop' ? 1 : 0.6 }]}>🛍️</Text>
                     </View>
-                    <Text style={[styles.navLabel, activeTab === 'shop' && styles.navLabelActive]}>
+                    <Text style={[dynamicStyles.navLabel, activeTab === 'shop' && { color: colors.primary, fontWeight: '600' }]}>
                         Shop
                     </Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('cart')}>
-                    <View style={styles.navIconContainer}>
-                        <Text style={styles.navIcon}>🛒</Text>
+                <TouchableOpacity style={dynamicStyles.navItem} onPress={() => setActiveTab('cart')}>
+                    <View style={dynamicStyles.navIconContainer}>
+                        <Text style={[dynamicStyles.navIcon, { opacity: activeTab === 'cart' ? 1 : 0.6 }]}>🛒</Text>
                     </View>
-                    <Text style={[styles.navLabel, activeTab === 'cart' && styles.navLabelActive]}>
+                    <Text style={[dynamicStyles.navLabel, activeTab === 'cart' && { color: colors.primary, fontWeight: '600' }]}>
                         Cart
                     </Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('profile')}>
-                    <View style={styles.navIconContainer}>
-                        <Text style={styles.navIcon}>👤</Text>
+                <TouchableOpacity style={dynamicStyles.navItem} onPress={() => setActiveTab('profile')}>
+                    <View style={dynamicStyles.navIconContainer}>
+                        <Text style={[dynamicStyles.navIcon, { opacity: activeTab === 'profile' ? 1 : 0.6 }]}>👤</Text>
                     </View>
-                    <Text style={[styles.navLabel, activeTab === 'profile' && styles.navLabelActive]}>
+                    <Text style={[dynamicStyles.navLabel, activeTab === 'profile' && { color: colors.primary, fontWeight: '600' }]}>
                         Profile
                     </Text>
                 </TouchableOpacity>
@@ -69,24 +73,29 @@ const UserDashboardScreen = () => {
     );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors, isDark) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
     },
     content: {
         flex: 1,
     },
     bottomNav: {
         flexDirection: 'row',
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.card,
         borderTopWidth: 1,
-        borderTopColor: '#E0E0E0',
+        borderTopColor: colors.border,
         paddingTop: 8,
         paddingBottom: 8,
         paddingHorizontal: 8,
         justifyContent: 'space-around',
         alignItems: 'center',
+        elevation: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: isDark ? 0.3 : 0.1,
+        shadowRadius: 4,
     },
     navItem: {
         flex: 1,
@@ -100,17 +109,10 @@ const styles = StyleSheet.create({
     navIcon: {
         fontSize: 24,
     },
-    navIconActive: {
-        opacity: 1,
-    },
     navLabel: {
         fontSize: 12,
-        color: '#666666',
+        color: colors.textSecondary,
         fontWeight: '500',
-    },
-    navLabelActive: {
-        color: '#228B22',
-        fontWeight: '600',
     },
 });
 

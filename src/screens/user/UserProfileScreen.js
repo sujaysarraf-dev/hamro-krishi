@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../config/supabase';
 import SweetAlert from '../../components/SweetAlert';
 
 const UserProfileScreen = () => {
     const router = useRouter();
+    const { colors, isDark } = useTheme();
     const [user, setUser] = useState(null);
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -149,68 +151,70 @@ const UserProfileScreen = () => {
         }
     };
 
+    const dynamicStyles = getStyles(colors, isDark);
+
     if (loading) {
         return (
-            <SafeAreaView style={styles.container}>
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color="#228B22" />
+            <SafeAreaView style={[dynamicStyles.container, { backgroundColor: colors.background }]}>
+                <View style={dynamicStyles.loadingContainer}>
+                    <ActivityIndicator size="large" color={colors.primary} />
                 </View>
             </SafeAreaView>
         );
     }
 
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>Profile</Text>
+        <SafeAreaView style={[dynamicStyles.container, { backgroundColor: colors.background }]}>
+            <View style={[dynamicStyles.header, { borderBottomColor: colors.border }]}>
+                <Text style={[dynamicStyles.headerTitle, { color: colors.text }]}>Profile</Text>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollView}>
-                <View style={styles.content}>
+            <ScrollView showsVerticalScrollIndicator={false} style={dynamicStyles.scrollView}>
+                <View style={dynamicStyles.content}>
                     {/* Profile Header */}
-                    <View style={styles.profileHeader}>
-                        <View style={styles.avatarContainer}>
+                    <View style={[dynamicStyles.profileHeader, { borderBottomColor: colors.border }]}>
+                        <View style={[dynamicStyles.avatarContainer, { backgroundColor: colors.primary }]}>
                             {profile?.avatar_url ? (
-                                <Image source={{ uri: profile.avatar_url }} style={styles.avatarImage} />
+                                <Image source={{ uri: profile.avatar_url }} style={dynamicStyles.avatarImage} />
                             ) : (
-                                <Text style={styles.avatarText}>
+                                <Text style={dynamicStyles.avatarText}>
                                     {profile?.full_name ? profile.full_name.charAt(0).toUpperCase() : user?.email?.charAt(0).toUpperCase() || 'U'}
                                 </Text>
                             )}
                         </View>
-                        <Text style={styles.userName}>
+                        <Text style={[dynamicStyles.userName, { color: colors.text }]}>
                             {profile?.full_name || user?.email || 'User'}
                         </Text>
-                        <Text style={styles.userEmail}>{user?.email || ''}</Text>
+                        <Text style={[dynamicStyles.userEmail, { color: colors.textSecondary }]}>{user?.email || ''}</Text>
                     </View>
 
                     {/* User Info Section */}
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Account Information</Text>
+                    <View style={dynamicStyles.section}>
+                        <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>Account Information</Text>
                         
-                        <View style={styles.infoRow}>
-                            <Text style={styles.infoLabel}>Full Name</Text>
-                            <Text style={styles.infoValue}>
+                        <View style={[dynamicStyles.infoRow, { borderBottomColor: colors.border }]}>
+                            <Text style={[dynamicStyles.infoLabel, { color: colors.textSecondary }]}>Full Name</Text>
+                            <Text style={[dynamicStyles.infoValue, { color: colors.text }]}>
                                 {profile?.full_name || 'Not set'}
                             </Text>
                         </View>
 
-                        <View style={styles.infoRow}>
-                            <Text style={styles.infoLabel}>Email</Text>
-                            <Text style={styles.infoValue}>
+                        <View style={[dynamicStyles.infoRow, { borderBottomColor: colors.border }]}>
+                            <Text style={[dynamicStyles.infoLabel, { color: colors.textSecondary }]}>Email</Text>
+                            <Text style={[dynamicStyles.infoValue, { color: colors.text }]}>
                                 {user?.email || 'Not available'}
                             </Text>
                         </View>
 
-                        <View style={styles.infoRow}>
-                            <Text style={styles.infoLabel}>Phone</Text>
-                            <Text style={styles.infoValue}>
+                        <View style={[dynamicStyles.infoRow, { borderBottomColor: colors.border }]}>
+                            <Text style={[dynamicStyles.infoLabel, { color: colors.textSecondary }]}>Phone</Text>
+                            <Text style={[dynamicStyles.infoValue, { color: colors.text }]}>
                                 {profile?.phone || 'Not set'}
                             </Text>
                         </View>
 
-                        <View style={styles.infoRow}>
-                            <Text style={styles.infoLabel}>Role</Text>
-                            <Text style={styles.infoValue}>
+                        <View style={[dynamicStyles.infoRow, { borderBottomColor: colors.border }]}>
+                            <Text style={[dynamicStyles.infoLabel, { color: colors.textSecondary }]}>Role</Text>
+                            <Text style={[dynamicStyles.infoValue, { color: colors.text }]}>
                                 {profile?.role ? profile.role.charAt(0).toUpperCase() + profile.role.slice(1) : 'Regular'}
                             </Text>
                         </View>
@@ -231,9 +235,9 @@ const UserProfileScreen = () => {
                                 }
                                 
                                 return interestsArray.length > 0 ? (
-                                    <View style={styles.infoRow}>
-                                        <Text style={styles.infoLabel}>Interests</Text>
-                                        <Text style={styles.infoValue}>
+                                    <View style={[dynamicStyles.infoRow, { borderBottomColor: colors.border }]}>
+                                        <Text style={[dynamicStyles.infoLabel, { color: colors.textSecondary }]}>Interests</Text>
+                                        <Text style={[dynamicStyles.infoValue, { color: colors.text }]}>
                                             {interestsArray.join(', ')}
                                         </Text>
                                     </View>
@@ -243,47 +247,47 @@ const UserProfileScreen = () => {
                     </View>
 
                     {/* Menu Options */}
-                    <View style={styles.section}>
+                    <View style={dynamicStyles.section}>
                         <TouchableOpacity 
-                            style={styles.menuItem}
+                            style={[dynamicStyles.menuItem, { borderBottomColor: colors.border }]}
                             onPress={() => router.push('/edit-profile')}
                         >
-                            <Text style={styles.menuIcon}>✏️</Text>
-                            <Text style={styles.menuText}>Edit Profile</Text>
-                            <Text style={styles.menuArrow}>›</Text>
+                            <Text style={dynamicStyles.menuIcon}>✏️</Text>
+                            <Text style={[dynamicStyles.menuText, { color: colors.text }]}>Edit Profile</Text>
+                            <Text style={[dynamicStyles.menuArrow, { color: colors.textSecondary }]}>›</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity 
-                            style={styles.menuItem}
+                            style={[dynamicStyles.menuItem, { borderBottomColor: colors.border }]}
                             onPress={() => router.push('/my-orders')}
                         >
-                            <Text style={styles.menuIcon}>📦</Text>
-                            <Text style={styles.menuText}>My Orders</Text>
-                            <Text style={styles.menuArrow}>›</Text>
+                            <Text style={dynamicStyles.menuIcon}>📦</Text>
+                            <Text style={[dynamicStyles.menuText, { color: colors.text }]}>My Orders</Text>
+                            <Text style={[dynamicStyles.menuArrow, { color: colors.textSecondary }]}>›</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity 
-                            style={styles.menuItem}
+                            style={[dynamicStyles.menuItem, { borderBottomColor: colors.border }]}
                             onPress={() => router.push('/addresses')}
                         >
-                            <Text style={styles.menuIcon}>📍</Text>
-                            <Text style={styles.menuText}>Addresses</Text>
-                            <Text style={styles.menuArrow}>›</Text>
+                            <Text style={dynamicStyles.menuIcon}>📍</Text>
+                            <Text style={[dynamicStyles.menuText, { color: colors.text }]}>Addresses</Text>
+                            <Text style={[dynamicStyles.menuArrow, { color: colors.textSecondary }]}>›</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity 
-                            style={styles.menuItem}
+                            style={[dynamicStyles.menuItem, { borderBottomColor: colors.border }]}
                             onPress={() => router.push('/settings')}
                         >
-                            <Text style={styles.menuIcon}>⚙️</Text>
-                            <Text style={styles.menuText}>Settings</Text>
-                            <Text style={styles.menuArrow}>›</Text>
+                            <Text style={dynamicStyles.menuIcon}>⚙️</Text>
+                            <Text style={[dynamicStyles.menuText, { color: colors.text }]}>Settings</Text>
+                            <Text style={[dynamicStyles.menuArrow, { color: colors.textSecondary }]}>›</Text>
                         </TouchableOpacity>
                     </View>
 
                     {/* Logout Button */}
-                    <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-                        <Text style={styles.logoutButtonText}>Logout</Text>
+                    <TouchableOpacity style={[dynamicStyles.logoutButton, { backgroundColor: colors.error }]} onPress={handleLogout}>
+                        <Text style={dynamicStyles.logoutButtonText}>Logout</Text>
                     </TouchableOpacity>
                 </View>
             </ScrollView>
@@ -314,10 +318,10 @@ const UserProfileScreen = () => {
     );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors, isDark) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
     },
     loadingContainer: {
         flex: 1,
@@ -329,12 +333,13 @@ const styles = StyleSheet.create({
         paddingTop: 20,
         paddingBottom: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
+        borderBottomColor: colors.border,
+        backgroundColor: colors.header,
     },
     headerTitle: {
         fontSize: 28,
         fontWeight: '700',
-        color: '#1F1F1F',
+        color: colors.text,
     },
     scrollView: {
         flex: 1,
@@ -347,13 +352,13 @@ const styles = StyleSheet.create({
         marginBottom: 32,
         paddingBottom: 24,
         borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
+        borderBottomColor: colors.border,
     },
     avatarContainer: {
         width: 100,
         height: 100,
         borderRadius: 50,
-        backgroundColor: '#228B22',
+        backgroundColor: colors.primary,
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 16,
@@ -370,12 +375,12 @@ const styles = StyleSheet.create({
     userName: {
         fontSize: 24,
         fontWeight: '700',
-        color: '#1F1F1F',
+        color: colors.text,
         marginBottom: 4,
     },
     userEmail: {
         fontSize: 14,
-        color: '#666666',
+        color: colors.textSecondary,
     },
     section: {
         marginBottom: 24,
@@ -383,7 +388,7 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#1F1F1F',
+        color: colors.text,
         marginBottom: 16,
     },
     infoRow: {
@@ -391,17 +396,17 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingVertical: 12,
         borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
+        borderBottomColor: colors.border,
     },
     infoLabel: {
         fontSize: 14,
-        color: '#666666',
+        color: colors.textSecondary,
         flex: 1,
     },
     infoValue: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#1F1F1F',
+        color: colors.text,
         flex: 1,
         textAlign: 'right',
     },
@@ -410,7 +415,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
+        borderBottomColor: colors.border,
     },
     menuIcon: {
         fontSize: 24,
@@ -420,14 +425,14 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: 16,
         fontWeight: '600',
-        color: '#1F1F1F',
+        color: colors.text,
     },
     menuArrow: {
         fontSize: 24,
-        color: '#666666',
+        color: colors.textSecondary,
     },
     logoutButton: {
-        backgroundColor: '#FF4444',
+        backgroundColor: colors.error,
         paddingVertical: 16,
         borderRadius: 12,
         justifyContent: 'center',

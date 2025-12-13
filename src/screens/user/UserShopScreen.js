@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Image, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
 const UserShopScreen = () => {
+    const { colors, isDark } = useTheme();
     const [searchQuery, setSearchQuery] = useState('');
 
     const commodities = [
@@ -66,85 +68,87 @@ const UserShopScreen = () => {
         },
     ];
 
+    const dynamicStyles = getStyles(colors, isDark);
+
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[dynamicStyles.container, { backgroundColor: colors.background }]}>
             <ScrollView showsVerticalScrollIndicator={false}>
-                <View style={styles.content}>
+                <View style={dynamicStyles.content}>
                     {/* Header */}
-                    <View style={styles.header}>
-                        <Text style={styles.headerTitle}>SHOP</Text>
-                        <View style={styles.searchContainer}>
-                            <Text style={styles.searchIcon}>🔍</Text>
+                    <View style={dynamicStyles.header}>
+                        <Text style={[dynamicStyles.headerTitle, { color: colors.text }]}>SHOP</Text>
+                        <View style={[dynamicStyles.searchContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                            <Text style={dynamicStyles.searchIcon}>🔍</Text>
                             <TextInput
-                                style={styles.searchInput}
+                                style={[dynamicStyles.searchInput, { color: colors.text }]}
                                 placeholder="Bahan pokok"
-                                placeholderTextColor="#999999"
+                                placeholderTextColor={colors.textSecondary}
                                 value={searchQuery}
                                 onChangeText={setSearchQuery}
                             />
                             <TouchableOpacity>
-                                <Text style={styles.filterIcon}>⚙️</Text>
+                                <Text style={dynamicStyles.filterIcon}>⚙️</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
 
                     {/* Pilih Komoditas Section */}
-                    <View style={styles.section}>
-                        <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>Pilih Komoditas</Text>
+                    <View style={dynamicStyles.section}>
+                        <View style={dynamicStyles.sectionHeader}>
+                            <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>Pilih Komoditas</Text>
                             <TouchableOpacity>
-                                <Text style={styles.moreLink}>Lainnya...</Text>
+                                <Text style={[dynamicStyles.moreLink, { color: colors.primary }]}>Lainnya...</Text>
                             </TouchableOpacity>
                         </View>
-                        <View style={styles.commoditiesGrid}>
+                        <View style={dynamicStyles.commoditiesGrid}>
                             {commodities.map((item) => (
-                                <TouchableOpacity key={item.id} style={styles.commodityCard}>
-                                    <Text style={styles.commodityIcon}>{item.icon}</Text>
-                                    <Text style={styles.commodityLabel}>{item.label}</Text>
+                                <TouchableOpacity key={item.id} style={[dynamicStyles.commodityCard, { backgroundColor: colors.surface }]}>
+                                    <Text style={dynamicStyles.commodityIcon}>{item.icon}</Text>
+                                    <Text style={[dynamicStyles.commodityLabel, { color: colors.text }]}>{item.label}</Text>
                                 </TouchableOpacity>
                             ))}
                         </View>
                     </View>
 
                     {/* Panen musim ini Section */}
-                    <View style={styles.section}>
-                        <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>Panen musim ini!</Text>
+                    <View style={dynamicStyles.section}>
+                        <View style={dynamicStyles.sectionHeader}>
+                            <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>Panen musim ini!</Text>
                             <TouchableOpacity>
-                                <Text style={styles.moreLink}>Muat lebih banyak...</Text>
+                                <Text style={[dynamicStyles.moreLink, { color: colors.primary }]}>Muat lebih banyak...</Text>
                             </TouchableOpacity>
                         </View>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={dynamicStyles.horizontalScroll}>
                             {seasonalProducts.map((product) => (
-                                <TouchableOpacity key={product.id} style={styles.productCard}>
-                                    <View style={styles.productImageContainer}>
-                                        <Text style={styles.productEmoji}>{product.image}</Text>
+                                <TouchableOpacity key={product.id} style={[dynamicStyles.productCard, { backgroundColor: colors.surface }]}>
+                                    <View style={[dynamicStyles.productImageContainer, { backgroundColor: colors.border }]}>
+                                        <Text style={dynamicStyles.productEmoji}>{product.image}</Text>
                                     </View>
-                                    <Text style={styles.productName}>{product.name}</Text>
-                                    <Text style={styles.productStore}>{product.store}</Text>
-                                    <Text style={styles.productPrice}>{product.price}</Text>
-                                    <Text style={styles.productLocation}>{product.location}</Text>
+                                    <Text style={[dynamicStyles.productName, { color: colors.text }]}>{product.name}</Text>
+                                    <Text style={[dynamicStyles.productStore, { color: colors.textSecondary }]}>{product.store}</Text>
+                                    <Text style={[dynamicStyles.productPrice, { color: colors.primary }]}>{product.price}</Text>
+                                    <Text style={[dynamicStyles.productLocation, { color: colors.textSecondary }]}>{product.location}</Text>
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
                     </View>
 
                     {/* Bawang Section */}
-                    <View style={styles.section}>
-                        <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>Bawang</Text>
+                    <View style={dynamicStyles.section}>
+                        <View style={dynamicStyles.sectionHeader}>
+                            <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>Bawang</Text>
                             <TouchableOpacity>
-                                <Text style={styles.moreLink}>Muat lebih banyak...</Text>
+                                <Text style={[dynamicStyles.moreLink, { color: colors.primary }]}>Muat lebih banyak...</Text>
                             </TouchableOpacity>
                         </View>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={dynamicStyles.horizontalScroll}>
                             {onionProducts.map((product) => (
-                                <TouchableOpacity key={product.id} style={styles.productCard}>
-                                    <View style={styles.productImageContainer}>
-                                        <Text style={styles.productEmoji}>{product.image}</Text>
+                                <TouchableOpacity key={product.id} style={[dynamicStyles.productCard, { backgroundColor: colors.surface }]}>
+                                    <View style={[dynamicStyles.productImageContainer, { backgroundColor: colors.border }]}>
+                                        <Text style={dynamicStyles.productEmoji}>{product.image}</Text>
                                     </View>
-                                    <Text style={styles.productStore}>{product.store}</Text>
-                                    <Text style={styles.productName}>{product.name}</Text>
+                                    <Text style={[dynamicStyles.productStore, { color: colors.textSecondary }]}>{product.store}</Text>
+                                    <Text style={[dynamicStyles.productName, { color: colors.text }]}>{product.name}</Text>
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
@@ -155,10 +159,10 @@ const UserShopScreen = () => {
     );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors, isDark) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.background,
     },
     content: {
         padding: 20,
@@ -169,16 +173,18 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 32,
         fontWeight: '700',
-        color: '#1F1F1F',
+        color: colors.text,
         marginBottom: 16,
     },
     searchContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#F5F5F5',
+        backgroundColor: colors.surface,
         borderRadius: 12,
         paddingHorizontal: 16,
         paddingVertical: 12,
+        borderWidth: 1,
+        borderColor: colors.border,
     },
     searchIcon: {
         fontSize: 20,
@@ -187,7 +193,7 @@ const styles = StyleSheet.create({
     searchInput: {
         flex: 1,
         fontSize: 16,
-        color: '#1F1F1F',
+        color: colors.text,
     },
     filterIcon: {
         fontSize: 20,
@@ -204,11 +210,11 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 20,
         fontWeight: '700',
-        color: '#1F1F1F',
+        color: colors.text,
     },
     moreLink: {
         fontSize: 14,
-        color: '#228B22',
+        color: colors.primary,
         fontWeight: '600',
     },
     commoditiesGrid: {
@@ -219,7 +225,7 @@ const styles = StyleSheet.create({
     commodityCard: {
         width: (width - 60) / 4,
         aspectRatio: 1,
-        backgroundColor: '#F0FFF4',
+        backgroundColor: colors.surface,
         borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
@@ -232,7 +238,7 @@ const styles = StyleSheet.create({
     commodityLabel: {
         fontSize: 12,
         fontWeight: '600',
-        color: '#1F1F1F',
+        color: colors.text,
         textAlign: 'center',
     },
     horizontalScroll: {
@@ -242,14 +248,14 @@ const styles = StyleSheet.create({
     productCard: {
         width: 180,
         marginRight: 16,
-        backgroundColor: '#F5F5F5',
+        backgroundColor: colors.surface,
         borderRadius: 12,
         padding: 12,
     },
     productImageContainer: {
         width: '100%',
         height: 140,
-        backgroundColor: '#E0E0E0',
+        backgroundColor: colors.border,
         borderRadius: 8,
         justifyContent: 'center',
         alignItems: 'center',
@@ -261,23 +267,23 @@ const styles = StyleSheet.create({
     productName: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#1F1F1F',
+        color: colors.text,
         marginBottom: 4,
     },
     productStore: {
         fontSize: 12,
-        color: '#666666',
+        color: colors.textSecondary,
         marginBottom: 4,
     },
     productPrice: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#228B22',
+        color: colors.primary,
         marginBottom: 4,
     },
     productLocation: {
         fontSize: 12,
-        color: '#666666',
+        color: colors.textSecondary,
     },
 });
 
