@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { useRouter, Redirect } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../src/config/supabase';
 import WelcomeScreen from '../src/screens/WelcomeScreen';
 
@@ -18,7 +19,9 @@ export default function Index() {
             console.log('Auth state changed:', event, session?.user?.id);
             
             if (event === 'SIGNED_OUT' || !session) {
-                // User logged out, show welcome screen
+                // User logged out, clear stored state and show welcome screen
+                await AsyncStorage.removeItem('isLoggedIn');
+                await AsyncStorage.removeItem('lastRoute');
                 setRedirectTo(null);
                 setShowWelcome(true);
                 setLoading(false);
@@ -39,16 +42,46 @@ export default function Index() {
             setShowWelcome(false);
             setRedirectTo(null);
             
-            // Small delay to ensure session is fully established after login
-            await new Promise(resolve => setTimeout(resolve, 100));
+            // First check AsyncStorage for login state (faster check)
+            const isLoggedIn = await AsyncStorage.getItem('isLoggedIn');
+            const savedRoute = await AsyncStorage.getItem('lastRoute');
             
-            // Check if user has an active session
+            console.log('AsyncStorage check:', { isLoggedIn, savedRoute });
+            
+            // If logged in state exists, try to verify with Supabase session
+            if (isLoggedIn === 'true' && savedRoute) {
+                // Small delay to ensure session is fully established
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                // Verify session with Supabase
+                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+                
+                if (session && session.user && !sessionError) {
+                    // Session is valid, redirect to saved route
+                    console.log('Valid session found, redirecting to:', savedRoute);
+                    setRedirectTo(savedRoute);
+                    setTimeout(() => {
+                        router.replace(savedRoute as any);
+                    }, 50);
+                    setLoading(false);
+                    return;
+                } else {
+                    // Session invalid, clear stored state
+                    console.log('Session invalid, clearing stored state');
+                    await AsyncStorage.removeItem('isLoggedIn');
+                    await AsyncStorage.removeItem('lastRoute');
+                }
+            }
+            
+            // Check Supabase session directly
             const { data: { session }, error: sessionError } = await supabase.auth.getSession();
             
             console.log('Session check:', { hasSession: !!session, userId: session?.user?.id, error: sessionError });
             
             if (sessionError) {
                 console.error('Session error:', sessionError);
+                await AsyncStorage.removeItem('isLoggedIn');
+                await AsyncStorage.removeItem('lastRoute');
                 setShowWelcome(true);
                 setLoading(false);
                 return;
@@ -76,6 +109,11 @@ export default function Index() {
                 } else {
                     targetRoute = '/user-dashboard';
                 }
+                
+                // Save login state and route to AsyncStorage
+                await AsyncStorage.setItem('isLoggedIn', 'true');
+                await AsyncStorage.setItem('lastRoute', targetRoute);
+                
                 console.log('Redirecting to:', targetRoute);
                 
                 // Set redirect state and navigate
@@ -89,13 +127,17 @@ export default function Index() {
                 // Keep loading true while redirecting
                 return;
             } else {
-                // No session, show welcome screen
+                // No session, clear stored state and show welcome screen
                 console.log('No session, showing welcome screen');
+                await AsyncStorage.removeItem('isLoggedIn');
+                await AsyncStorage.removeItem('lastRoute');
                 setShowWelcome(true);
                 setLoading(false);
             }
         } catch (error) {
             console.error('Auth check error:', error);
+            await AsyncStorage.removeItem('isLoggedIn');
+            await AsyncStorage.removeItem('lastRoute');
             setShowWelcome(true);
             setLoading(false);
         }

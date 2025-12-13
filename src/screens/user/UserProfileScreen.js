@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../config/supabase';
 import SweetAlert from '../../components/SweetAlert';
@@ -15,6 +16,7 @@ const UserProfileScreen = () => {
     const [logoutAlert, setLogoutAlert] = useState({ visible: false, type: 'warning', title: '', message: '' });
 
     useEffect(() => {
+        console.log('UserProfileScreen mounted');
         loadUserData();
     }, []);
 
@@ -158,6 +160,9 @@ const UserProfileScreen = () => {
             if (error) {
                 throw error;
             }
+            // Clear login state from AsyncStorage
+            await AsyncStorage.removeItem('isLoggedIn');
+            await AsyncStorage.removeItem('lastRoute');
             // Navigate to root which will show welcome screen
             router.replace('/');
         } catch (error) {
@@ -174,6 +179,8 @@ const UserProfileScreen = () => {
 
     const dynamicStyles = getStyles(colors, isDark);
 
+    console.log('UserProfileScreen render - loading:', loading, 'user:', !!user, 'profile:', !!profile);
+
     if (loading) {
         return (
             <SafeAreaView style={[dynamicStyles.container, { backgroundColor: colors.background }]}>
@@ -189,7 +196,11 @@ const UserProfileScreen = () => {
             <View style={[dynamicStyles.header, { borderBottomColor: colors.border }]}>
                 <Text style={[dynamicStyles.headerTitle, { color: colors.text }]}>Profile</Text>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={dynamicStyles.scrollView}>
+            <ScrollView 
+                showsVerticalScrollIndicator={false} 
+                style={dynamicStyles.scrollView}
+                contentContainerStyle={dynamicStyles.scrollContent}
+            >
                 <View style={dynamicStyles.content}>
                     {/* Profile Header */}
                     <View style={[dynamicStyles.profileHeader, { borderBottomColor: colors.border }]}>
@@ -243,9 +254,13 @@ const UserProfileScreen = () => {
 
                     {/* Menu Options */}
                     <View style={dynamicStyles.section}>
+                        <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>Menu</Text>
                         <TouchableOpacity 
                             style={[dynamicStyles.menuItem, { borderBottomColor: colors.border }]}
-                            onPress={() => router.push('/edit-profile')}
+                            onPress={() => {
+                                console.log('Edit Profile pressed');
+                                router.push('/edit-profile');
+                            }}
                         >
                             <Text style={dynamicStyles.menuIcon}>✏️</Text>
                             <Text style={[dynamicStyles.menuText, { color: colors.text }]}>Edit Profile</Text>
@@ -254,7 +269,10 @@ const UserProfileScreen = () => {
 
                         <TouchableOpacity 
                             style={[dynamicStyles.menuItem, { borderBottomColor: colors.border }]}
-                            onPress={() => router.push('/my-orders')}
+                            onPress={() => {
+                                console.log('My Orders pressed');
+                                router.push('/my-orders');
+                            }}
                         >
                             <Text style={dynamicStyles.menuIcon}>📦</Text>
                             <Text style={[dynamicStyles.menuText, { color: colors.text }]}>My Orders</Text>
@@ -263,16 +281,38 @@ const UserProfileScreen = () => {
 
                         <TouchableOpacity 
                             style={[dynamicStyles.menuItem, { borderBottomColor: colors.border }]}
-                            onPress={() => router.push('/addresses')}
+                            onPress={() => {
+                                console.log('Addresses pressed');
+                                router.push('/addresses');
+                            }}
                         >
                             <Text style={dynamicStyles.menuIcon}>📍</Text>
                             <Text style={[dynamicStyles.menuText, { color: colors.text }]}>Addresses</Text>
                             <Text style={[dynamicStyles.menuArrow, { color: colors.textSecondary }]}>›</Text>
                         </TouchableOpacity>
+                    </View>
+
+                    {/* Business Options */}
+                    <View style={dynamicStyles.section}>
+                        <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>Business</Text>
+                        <TouchableOpacity 
+                            style={[dynamicStyles.menuItem, { borderBottomColor: colors.border, backgroundColor: colors.surface }]}
+                            onPress={() => {
+                                console.log('Sell Raw Materials pressed');
+                                router.push('/sell-raw-materials');
+                            }}
+                        >
+                            <Text style={dynamicStyles.menuIcon}>🏭</Text>
+                            <Text style={[dynamicStyles.menuText, { color: colors.text, fontWeight: '700' }]}>Sell Raw Materials</Text>
+                            <Text style={[dynamicStyles.menuArrow, { color: colors.textSecondary }]}>›</Text>
+                        </TouchableOpacity>
 
                         <TouchableOpacity 
                             style={[dynamicStyles.menuItem, { borderBottomColor: colors.border }]}
-                            onPress={() => router.push('/settings')}
+                            onPress={() => {
+                                console.log('Settings pressed');
+                                router.push('/settings');
+                            }}
                         >
                             <Text style={dynamicStyles.menuIcon}>⚙️</Text>
                             <Text style={[dynamicStyles.menuText, { color: colors.text }]}>Settings</Text>
@@ -338,6 +378,10 @@ const getStyles = (colors, isDark) => StyleSheet.create({
     },
     scrollView: {
         flex: 1,
+    },
+    scrollContent: {
+        flexGrow: 1,
+        paddingBottom: 20,
     },
     content: {
         padding: 20,

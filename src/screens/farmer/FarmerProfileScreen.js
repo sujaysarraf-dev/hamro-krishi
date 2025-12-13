@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../config/supabase';
 import SweetAlert from '../../components/SweetAlert';
@@ -151,6 +152,9 @@ const FarmerProfileScreen = () => {
             if (error) {
                 throw error;
             }
+            // Clear login state from AsyncStorage
+            await AsyncStorage.removeItem('isLoggedIn');
+            await AsyncStorage.removeItem('lastRoute');
             router.replace('/');
         } catch (error) {
             console.error('Logout error:', error);
@@ -181,7 +185,11 @@ const FarmerProfileScreen = () => {
             <View style={[dynamicStyles.header, { borderBottomColor: colors.border }]}>
                 <Text style={[dynamicStyles.headerTitle, { color: colors.text }]}>Profile</Text>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={dynamicStyles.scrollView}>
+            <ScrollView 
+                showsVerticalScrollIndicator={false} 
+                style={dynamicStyles.scrollView}
+                contentContainerStyle={dynamicStyles.scrollContent}
+            >
                 <View style={dynamicStyles.content}>
                     {/* Profile Header */}
                     <View style={[dynamicStyles.profileHeader, { borderBottomColor: colors.border }]}>
@@ -272,6 +280,15 @@ const FarmerProfileScreen = () => {
 
                         <TouchableOpacity 
                             style={[dynamicStyles.menuItem, { borderBottomColor: colors.border }]}
+                            onPress={() => router.push('/sell-raw-materials')}
+                        >
+                            <Text style={dynamicStyles.menuIcon}>🏭</Text>
+                            <Text style={[dynamicStyles.menuText, { color: colors.text }]}>Sell Raw Materials</Text>
+                            <Text style={[dynamicStyles.menuArrow, { color: colors.textSecondary }]}>›</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            style={[dynamicStyles.menuItem, { borderBottomColor: colors.border }]}
                             onPress={() => router.push('/settings')}
                         >
                             <Text style={dynamicStyles.menuIcon}>⚙️</Text>
@@ -338,6 +355,10 @@ const getStyles = (colors, isDark) => StyleSheet.create({
     },
     scrollView: {
         flex: 1,
+    },
+    scrollContent: {
+        flexGrow: 1,
+        paddingBottom: 20,
     },
     content: {
         padding: 20,
