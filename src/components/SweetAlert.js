@@ -148,6 +148,7 @@ const styles = StyleSheet.create({
         width: width * 0.85,
         maxWidth: 400,
         alignItems: 'center',
+        // Native shadow props (iOS/Android)
         shadowColor: '#000',
         shadowOffset: {
             width: 0,
@@ -156,6 +157,8 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.25,
         shadowRadius: 20,
         elevation: 10,
+        // Web shadow (react-native-web)
+        boxShadow: '0px 10px 20px rgba(0, 0, 0, 0.25)',
     },
     iconContainer: {
         width: 80,
