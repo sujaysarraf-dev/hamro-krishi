@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../config/supabase';
 import { useFocusEffect } from 'expo-router';
+import ProductDetailModal from '../../components/ProductDetailModal';
 
 const { width } = Dimensions.get('window');
 
@@ -13,6 +14,8 @@ const UserHomeScreen = () => {
     const [selectedCategory, setSelectedCategory] = useState('all');
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [selectedProduct, setSelectedProduct] = useState(null);
+    const [modalVisible, setModalVisible] = useState(false);
 
     const productCategories = ['grain', 'vegetable', 'fruit', 'livestock', 'cash crop', 'spice and herb', 'fish'];
 
@@ -92,32 +95,15 @@ const UserHomeScreen = () => {
         return product.name.toLowerCase().includes(searchQuery.toLowerCase());
     });
 
-    const seasonalProducts = [
-        {
-            id: 1,
-            name: 'Strawberry',
-            store: 'Farm Fresh Store',
-            price: 'NPR 1,300',
-            location: 'Kathmandu, Nepal',
-            image: '🍓'
-        },
-        {
-            id: 2,
-            name: 'Mango',
-            store: 'Green Market',
-            price: 'NPR 30/kg',
-            location: 'Pokhara, Nepal',
-            image: '🥭'
-        },
-        {
-            id: 3,
-            name: 'Lichi',
-            store: 'Fresh Farm',
-            price: 'NPR 14',
-            location: 'Lalitpur, Nepal',
-            image: '🍒'
-        },
-    ];
+    const handleProductPress = (product) => {
+        setSelectedProduct(product);
+        setModalVisible(true);
+    };
+
+    const handleCloseModal = () => {
+        setModalVisible(false);
+        setSelectedProduct(null);
+    };
 
     const [featuredProducts, setFeaturedProducts] = useState([]);
     const [loadingFeatured, setLoadingFeatured] = useState(false);
@@ -250,84 +236,56 @@ const UserHomeScreen = () => {
                         </ScrollView>
                     </View>
 
-                    {/* All Products Section - Show dummy data when "All" is selected */}
+                    {/* All Products Section - Show featured products from DB when "All" is selected */}
                     {selectedCategory === 'all' && (
-                        <>
-                            {/* Seasonal Products Section */}
-                            <View style={dynamicStyles.section}>
-                                <View style={dynamicStyles.sectionHeader}>
-                                    <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>Seasonal Products</Text>
-                                    <TouchableOpacity>
-                                        <Text style={[dynamicStyles.moreLink, { color: colors.primary }]}>View More...</Text>
-                                    </TouchableOpacity>
+                        <View style={dynamicStyles.section}>
+                            <View style={dynamicStyles.sectionHeader}>
+                                <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>Products</Text>
+                            </View>
+                            {loadingFeatured ? (
+                                <View style={dynamicStyles.loadingContainer}>
+                                    <ActivityIndicator size="large" color={colors.primary} />
                                 </View>
+                            ) : featuredProducts.length > 0 ? (
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={dynamicStyles.horizontalScroll}>
-                                    {seasonalProducts.map((product) => (
-                                        <TouchableOpacity key={product.id} style={[dynamicStyles.productCard, { backgroundColor: colors.surface }]}>
+                                    {featuredProducts.map((product) => (
+                                        <TouchableOpacity 
+                                            key={product.id} 
+                                            style={[dynamicStyles.productCard, { backgroundColor: colors.surface }]}
+                                            onPress={() => handleProductPress(product)}
+                                        >
                                             <View style={[dynamicStyles.productImageContainer, { backgroundColor: colors.border }]}>
-                                                <Text style={dynamicStyles.productEmoji}>{product.image}</Text>
+                                                {product.image_url ? (
+                                                    <Image 
+                                                        source={{ uri: product.image_url }} 
+                                                        style={dynamicStyles.productImage}
+                                                        resizeMode="cover"
+                                                    />
+                                                ) : (
+                                                    <Text style={dynamicStyles.productEmoji}>🌾</Text>
+                                                )}
                                             </View>
-                                            <Text style={[dynamicStyles.productName, { color: colors.text }]}>{product.name}</Text>
-                                            <Text style={[dynamicStyles.productStore, { color: colors.textSecondary }]}>{product.store}</Text>
-                                            <Text style={[dynamicStyles.productPrice, { color: colors.primary }]}>{product.price}</Text>
-                                            <Text style={[dynamicStyles.productLocation, { color: colors.textSecondary }]}>{product.location}</Text>
+                                            <Text style={[dynamicStyles.productName, { color: colors.text }]} numberOfLines={1}>
+                                                {product.name}
+                                            </Text>
+                                            <Text style={[dynamicStyles.productStore, { color: colors.textSecondary }]} numberOfLines={1}>
+                                                {product.user_profiles?.full_name || 'Farmer'}
+                                            </Text>
+                                            <Text style={[dynamicStyles.productPrice, { color: colors.primary }]}>
+                                                NPR {formatPrice(product.price)} / {product.stock_unit || 'kilograms'}
+                                            </Text>
                                         </TouchableOpacity>
                                     ))}
                                 </ScrollView>
-                            </View>
-
-                            {/* Products Section */}
-                            <View style={dynamicStyles.section}>
-                                <View style={dynamicStyles.sectionHeader}>
-                                    <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>Products</Text>
-                                    <TouchableOpacity>
-                                        <Text style={[dynamicStyles.moreLink, { color: colors.primary }]}>View More...</Text>
-                                    </TouchableOpacity>
+                            ) : (
+                                <View style={dynamicStyles.emptyContainer}>
+                                    <Text style={dynamicStyles.emptyIcon}>🌾</Text>
+                                    <Text style={[dynamicStyles.emptyText, { color: colors.text }]}>
+                                        No products available
+                                    </Text>
                                 </View>
-                                {loadingFeatured ? (
-                                    <View style={dynamicStyles.loadingContainer}>
-                                        <ActivityIndicator size="large" color={colors.primary} />
-                                    </View>
-                                ) : featuredProducts.length > 0 ? (
-                                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={dynamicStyles.horizontalScroll}>
-                                        {featuredProducts.map((product) => (
-                                            <TouchableOpacity 
-                                                key={product.id} 
-                                                style={[dynamicStyles.productCard, { backgroundColor: colors.surface }]}
-                                            >
-                                                <View style={[dynamicStyles.productImageContainer, { backgroundColor: colors.border }]}>
-                                                    {product.image_url ? (
-                                                        <Image 
-                                                            source={{ uri: product.image_url }} 
-                                                            style={dynamicStyles.productImage}
-                                                            resizeMode="cover"
-                                                        />
-                                                    ) : (
-                                                        <Text style={dynamicStyles.productEmoji}>🌾</Text>
-                                                    )}
-                                                </View>
-                                                <Text style={[dynamicStyles.productName, { color: colors.text }]} numberOfLines={1}>
-                                                    {product.name}
-                                                </Text>
-                                                <Text style={[dynamicStyles.productStore, { color: colors.textSecondary }]} numberOfLines={1}>
-                                                    {product.user_profiles?.full_name || 'Farmer'}
-                                                </Text>
-                                                <Text style={[dynamicStyles.productPrice, { color: colors.primary }]}>
-                                                    NPR {formatPrice(product.price)} / {product.stock_unit || 'kilograms'}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        ))}
-                                    </ScrollView>
-                                ) : (
-                                    <View style={dynamicStyles.emptyContainer}>
-                                        <Text style={dynamicStyles.emptyIcon}>🌾</Text>
-                                        <Text style={[dynamicStyles.emptyText, { color: colors.text }]}>
-                                            No products available
-                                        </Text>
-                                    </View>
-                                )}
-                            </View>
-                        </>
+                            )}
+                        </View>
                     )}
 
                     {/* Category Products Section - Show real products from database when category is selected */}
@@ -348,6 +306,7 @@ const UserHomeScreen = () => {
                                         <TouchableOpacity 
                                             key={product.id} 
                                             style={[dynamicStyles.productCard, { backgroundColor: colors.surface }]}
+                                            onPress={() => handleProductPress(product)}
                                         >
                                             <View style={[dynamicStyles.productImageContainer, { backgroundColor: colors.border }]}>
                                                 {product.image_url ? (
@@ -394,6 +353,11 @@ const UserHomeScreen = () => {
                     )}
                 </View>
             </ScrollView>
+            <ProductDetailModal
+                visible={modalVisible}
+                product={selectedProduct}
+                onClose={handleCloseModal}
+            />
         </SafeAreaView>
     );
 };

@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import FarmerHomeScreen from './FarmerHomeScreen';
 import FarmerProductsScreen from './FarmerProductsScreen';
-import FarmerOrdersScreen from './FarmerOrdersScreen';
+import FarmerHistoryScreen from './FarmerHistoryScreen';
 import FarmerProfileScreen from './FarmerProfileScreen';
 
 const FarmerDashboardScreen = () => {
@@ -18,7 +18,7 @@ const FarmerDashboardScreen = () => {
             case 'products':
                 return <FarmerProductsScreen />;
             case 'orders':
-                return <FarmerOrdersScreen />;
+                return <FarmerHistoryScreen />;
             case 'profile':
                 return <FarmerProfileScreen />;
             default:

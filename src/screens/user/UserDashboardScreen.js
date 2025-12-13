@@ -3,8 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import UserHomeScreen from './UserHomeScreen';
-import UserShopScreen from './UserShopScreen';
 import UserCartScreen from './UserCartScreen';
+import UserHistoryScreen from './UserHistoryScreen';
 import UserProfileScreen from './UserProfileScreen';
 
 const UserDashboardScreen = () => {
@@ -15,10 +15,10 @@ const UserDashboardScreen = () => {
         switch (activeTab) {
             case 'home':
                 return <UserHomeScreen />;
-            case 'shop':
-                return <UserShopScreen />;
             case 'cart':
                 return <UserCartScreen />;
+            case 'history':
+                return <UserHistoryScreen />;
             case 'profile':
                 return <UserProfileScreen />;
             default:
@@ -44,20 +44,20 @@ const UserDashboardScreen = () => {
                         Home
                     </Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={dynamicStyles.navItem} onPress={() => setActiveTab('shop')}>
-                    <View style={dynamicStyles.navIconContainer}>
-                        <Text style={[dynamicStyles.navIcon, { opacity: activeTab === 'shop' ? 1 : 0.6 }]}>🛍️</Text>
-                    </View>
-                    <Text style={[dynamicStyles.navLabel, activeTab === 'shop' && { color: colors.primary, fontWeight: '600' }]}>
-                        Shop
-                    </Text>
-                </TouchableOpacity>
                 <TouchableOpacity style={dynamicStyles.navItem} onPress={() => setActiveTab('cart')}>
                     <View style={dynamicStyles.navIconContainer}>
                         <Text style={[dynamicStyles.navIcon, { opacity: activeTab === 'cart' ? 1 : 0.6 }]}>🛒</Text>
                     </View>
                     <Text style={[dynamicStyles.navLabel, activeTab === 'cart' && { color: colors.primary, fontWeight: '600' }]}>
                         Cart
+                    </Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={dynamicStyles.navItem} onPress={() => setActiveTab('history')}>
+                    <View style={dynamicStyles.navIconContainer}>
+                        <Text style={[dynamicStyles.navIcon, { opacity: activeTab === 'history' ? 1 : 0.6 }]}>📦</Text>
+                    </View>
+                    <Text style={[dynamicStyles.navLabel, activeTab === 'history' && { color: colors.primary, fontWeight: '600' }]}>
+                        History
                     </Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={dynamicStyles.navItem} onPress={() => setActiveTab('profile')}>

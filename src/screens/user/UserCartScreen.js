@@ -1,74 +1,31 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
+import { useCart } from '../../context/CartContext';
+import { supabase } from '../../config/supabase';
+import { useRouter } from 'expo-router';
 import SweetAlert from '../../components/SweetAlert';
 
 const { width } = Dimensions.get('window');
 
 const UserCartScreen = () => {
     const { colors, isDark } = useTheme();
-    const [cartItems, setCartItems] = useState([
-        {
-            id: 1,
-            name: 'Padi',
-            store: 'Toko Abadi Sentosa',
-            price: 1300000,
-            priceDisplay: 'Rp 1,300,000',
-            quantity: 1,
-            image: '🌾'
-        },
-        {
-            id: 2,
-            name: 'Cabai',
-            store: 'Toko Kelontong',
-            price: 30000,
-            priceDisplay: 'Rp 30.000/kg',
-            quantity: 2,
-            image: '🌶️'
-        },
-    ]);
-
+    const router = useRouter();
+    const { cartItems, updateQuantity, removeFromCart, clearCart, getCartTotal } = useCart();
     const [alert, setAlert] = useState({ visible: false, type: 'info', title: '', message: '' });
+    const [processing, setProcessing] = useState(false);
 
-    // Calculate total
-    const total = useMemo(() => {
-        return cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    }, [cartItems]);
+    const dynamicStyles = getStyles(colors, isDark);
 
     const formatPrice = (price) => {
-        return new Intl.NumberFormat('id-ID', {
-            style: 'currency',
-            currency: 'IDR',
+        return new Intl.NumberFormat('en-NP', {
             minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
         }).format(price);
     };
 
-    const increaseQuantity = (itemId) => {
-        setCartItems(prevItems =>
-            prevItems.map(item =>
-                item.id === itemId
-                    ? { ...item, quantity: item.quantity + 1 }
-                    : item
-            )
-        );
-    };
-
-    const decreaseQuantity = (itemId) => {
-        setCartItems(prevItems =>
-            prevItems.map(item =>
-                item.id === itemId && item.quantity > 1
-                    ? { ...item, quantity: item.quantity - 1 }
-                    : item
-            )
-        );
-    };
-
-    const deleteItem = (itemId) => {
-        setCartItems(prevItems => prevItems.filter(item => item.id !== itemId));
-    };
-
-    const handleCheckout = () => {
+    const handleCheckout = async () => {
         if (cartItems.length === 0) {
             setAlert({
                 visible: true,
@@ -79,19 +36,75 @@ const UserCartScreen = () => {
             return;
         }
 
-        setAlert({
-            visible: true,
-            type: 'success',
-            title: 'Order Placed!',
-            message: `Your order of ${cartItems.length} item(s) totaling ${formatPrice(total)} has been placed successfully!`,
-            onConfirm: () => {
-                // Clear cart after successful checkout
-                setCartItems([]);
+        setProcessing(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                router.replace('/regular-login');
+                return;
             }
-        });
-    };
 
-    const dynamicStyles = getStyles(colors, isDark);
+            // Calculate total
+            const totalAmount = getCartTotal();
+
+            // Create order
+            const { data: order, error: orderError } = await supabase
+                .from('orders')
+                .insert({
+                    user_id: user.id,
+                    total_amount: totalAmount,
+                    status: 'pending',
+                    payment_status: 'pending'
+                })
+                .select()
+                .single();
+
+            if (orderError) {
+                throw orderError;
+            }
+
+            // Create order items
+            const orderItemsData = cartItems.map(item => ({
+                order_id: order.id,
+                product_id: item.product_id,
+                quantity: item.quantity,
+                unit_price: item.price,
+                total_price: item.price * item.quantity
+            }));
+
+            const { error: itemsError } = await supabase
+                .from('order_items')
+                .insert(orderItemsData);
+
+            if (itemsError) {
+                throw itemsError;
+            }
+
+            // Clear cart
+            clearCart();
+
+            setAlert({
+                visible: true,
+                type: 'success',
+                title: 'Order Placed!',
+                message: `Your order of ${cartItems.length} item(s) totaling NPR ${formatPrice(totalAmount)} has been placed successfully!`,
+                onConfirm: () => {
+                    setAlert({ ...alert, visible: false });
+                    router.push('/user-dashboard');
+                }
+            });
+        } catch (error) {
+            console.error('Checkout error:', error);
+            setAlert({
+                visible: true,
+                type: 'error',
+                title: 'Checkout Failed',
+                message: 'Failed to place order. Please try again.'
+            });
+        } finally {
+            setProcessing(false);
+        }
+    };
 
     return (
         <SafeAreaView style={[dynamicStyles.container, { backgroundColor: colors.background }]}>
@@ -109,25 +122,35 @@ const UserCartScreen = () => {
                     ) : (
                         <>
                             {cartItems.map((item) => (
-                                <View key={item.id} style={[dynamicStyles.cartItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                                <View key={item.product_id} style={[dynamicStyles.cartItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                                     <View style={[dynamicStyles.itemImageContainer, { backgroundColor: colors.border }]}>
-                                        <Text style={dynamicStyles.itemEmoji}>{item.image}</Text>
+                                        {item.image_url ? (
+                                            <Image 
+                                                source={{ uri: item.image_url }} 
+                                                style={dynamicStyles.itemImage}
+                                                resizeMode="cover"
+                                            />
+                                        ) : (
+                                            <Text style={dynamicStyles.itemEmoji}>🌾</Text>
+                                        )}
                                     </View>
                                     <View style={dynamicStyles.itemDetails}>
                                         <Text style={[dynamicStyles.itemName, { color: colors.text }]}>{item.name}</Text>
-                                        <Text style={[dynamicStyles.itemStore, { color: colors.textSecondary }]}>{item.store}</Text>
-                                        <Text style={[dynamicStyles.itemPrice, { color: colors.primary }]}>{item.priceDisplay}</Text>
+                                        <Text style={[dynamicStyles.itemStore, { color: colors.textSecondary }]}>{item.farmer_name}</Text>
+                                        <Text style={[dynamicStyles.itemPrice, { color: colors.primary }]}>
+                                            NPR {formatPrice(item.price)} / {item.stock_unit}
+                                        </Text>
                                         <View style={dynamicStyles.quantityContainer}>
                                             <TouchableOpacity 
                                                 style={[dynamicStyles.quantityButton, { backgroundColor: colors.border }]}
-                                                onPress={() => decreaseQuantity(item.id)}
+                                                onPress={() => updateQuantity(item.product_id, item.quantity - 1)}
                                             >
                                                 <Text style={[dynamicStyles.quantityButtonText, { color: colors.text }]}>-</Text>
                                             </TouchableOpacity>
                                             <Text style={[dynamicStyles.quantityText, { color: colors.text }]}>{item.quantity}</Text>
                                             <TouchableOpacity 
                                                 style={[dynamicStyles.quantityButton, { backgroundColor: colors.border }]}
-                                                onPress={() => increaseQuantity(item.id)}
+                                                onPress={() => updateQuantity(item.product_id, item.quantity + 1)}
                                             >
                                                 <Text style={[dynamicStyles.quantityButtonText, { color: colors.text }]}>+</Text>
                                             </TouchableOpacity>
@@ -135,7 +158,7 @@ const UserCartScreen = () => {
                                     </View>
                                     <TouchableOpacity 
                                         style={dynamicStyles.deleteButton}
-                                        onPress={() => deleteItem(item.id)}
+                                        onPress={() => removeFromCart(item.product_id)}
                                     >
                                         <Text style={dynamicStyles.deleteIcon}>🗑️</Text>
                                     </TouchableOpacity>
@@ -143,7 +166,7 @@ const UserCartScreen = () => {
                             ))}
                             <View style={[dynamicStyles.totalContainer, { borderTopColor: colors.border }]}>
                                 <Text style={[dynamicStyles.totalLabel, { color: colors.text }]}>Total:</Text>
-                                <Text style={[dynamicStyles.totalAmount, { color: colors.primary }]}>{formatPrice(total)}</Text>
+                                <Text style={[dynamicStyles.totalAmount, { color: colors.primary }]}>NPR {formatPrice(getCartTotal())}</Text>
                             </View>
                         </>
                     )}
@@ -152,10 +175,15 @@ const UserCartScreen = () => {
             {cartItems.length > 0 && (
                 <View style={[dynamicStyles.checkoutContainer, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
                     <TouchableOpacity 
-                        style={[dynamicStyles.checkoutButton, { backgroundColor: colors.primary }]}
+                        style={[dynamicStyles.checkoutButton, { backgroundColor: colors.primary }, processing && dynamicStyles.checkoutButtonDisabled]}
                         onPress={handleCheckout}
+                        disabled={processing}
                     >
-                        <Text style={dynamicStyles.checkoutButtonText}>Checkout</Text>
+                        {processing ? (
+                            <Text style={dynamicStyles.checkoutButtonText}>Processing...</Text>
+                        ) : (
+                            <Text style={dynamicStyles.checkoutButtonText}>Checkout</Text>
+                        )}
                     </TouchableOpacity>
                 </View>
             )}
@@ -236,6 +264,11 @@ const getStyles = (colors, isDark) => StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
+    },
+    itemImage: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 8,
     },
     itemEmoji: {
         fontSize: 40,
@@ -325,6 +358,9 @@ const getStyles = (colors, isDark) => StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
+    checkoutButtonDisabled: {
+        opacity: 0.6,
+    },
     checkoutButtonText: {
         color: '#FFFFFF',
         fontSize: 18,
@@ -333,4 +369,3 @@ const getStyles = (colors, isDark) => StyleSheet.create({
 });
 
 export default UserCartScreen;
-

@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../config/supabase';
 import { useFocusEffect } from 'expo-router';
+import ProductDetailModal from '../../components/ProductDetailModal';
 
 const { width } = Dimensions.get('window');
 
@@ -13,6 +14,8 @@ const UserShopScreen = () => {
     const [selectedCategory, setSelectedCategory] = useState('all');
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [selectedProduct, setSelectedProduct] = useState(null);
+    const [modalVisible, setModalVisible] = useState(false);
 
     const productCategories = ['grain', 'vegetable', 'fruit', 'livestock', 'cash crop', 'spice and herb', 'fish'];
 
@@ -92,53 +95,15 @@ const UserShopScreen = () => {
         return product.name.toLowerCase().includes(searchQuery.toLowerCase());
     });
 
-    const seasonalProducts = [
-        {
-            id: 1,
-            name: 'Rice',
-            store: 'Farm Fresh Store',
-            price: 'NPR 1,300',
-            location: 'Kathmandu, Nepal',
-            image: '🌾'
-        },
-        {
-            id: 2,
-            name: 'Chili',
-            store: 'Green Market',
-            price: 'NPR 30/kg',
-            location: 'Pokhara, Nepal',
-            image: '🌶️'
-        },
-        {
-            id: 3,
-            name: 'Onion',
-            store: 'Fresh Farm',
-            price: 'NPR 14',
-            location: 'Lalitpur, Nepal',
-            image: '🧅'
-        },
-    ];
+    const handleProductPress = (product) => {
+        setSelectedProduct(product);
+        setModalVisible(true);
+    };
 
-    const onionProducts = [
-        {
-            id: 1,
-            name: 'Red Onion',
-            store: 'Farm Fresh Store',
-            image: '🧅'
-        },
-        {
-            id: 2,
-            name: 'Yellow Onion',
-            store: 'Green Market',
-            image: '🧅'
-        },
-        {
-            id: 3,
-            name: 'Garlic',
-            store: 'Fresh Farm',
-            image: '🧄'
-        },
-    ];
+    const handleCloseModal = () => {
+        setModalVisible(false);
+        setSelectedProduct(null);
+    };
 
     const dynamicStyles = getStyles(colors, isDark);
 
@@ -211,53 +176,14 @@ const UserShopScreen = () => {
                         </ScrollView>
                     </View>
 
-                    {/* All Products Section - Show dummy data when "All" is selected */}
+                    {/* All Products Section - Show empty when "All" is selected */}
                     {selectedCategory === 'all' && (
-                        <>
-                            {/* Seasonal Products Section */}
-                            <View style={dynamicStyles.section}>
-                                <View style={dynamicStyles.sectionHeader}>
-                                    <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>Seasonal Products</Text>
-                                    <TouchableOpacity>
-                                        <Text style={[dynamicStyles.moreLink, { color: colors.primary }]}>View More...</Text>
-                                    </TouchableOpacity>
-                                </View>
-                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={dynamicStyles.horizontalScroll}>
-                                    {seasonalProducts.map((product) => (
-                                        <TouchableOpacity key={product.id} style={[dynamicStyles.productCard, { backgroundColor: colors.surface }]}>
-                                            <View style={[dynamicStyles.productImageContainer, { backgroundColor: colors.border }]}>
-                                                <Text style={dynamicStyles.productEmoji}>{product.image}</Text>
-                                            </View>
-                                            <Text style={[dynamicStyles.productName, { color: colors.text }]}>{product.name}</Text>
-                                            <Text style={[dynamicStyles.productStore, { color: colors.textSecondary }]}>{product.store}</Text>
-                                            <Text style={[dynamicStyles.productPrice, { color: colors.primary }]}>{product.price}</Text>
-                                            <Text style={[dynamicStyles.productLocation, { color: colors.textSecondary }]}>{product.location}</Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </ScrollView>
-                            </View>
-
-                            {/* Onion Section */}
-                            <View style={dynamicStyles.section}>
-                                <View style={dynamicStyles.sectionHeader}>
-                                    <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>Onion</Text>
-                                    <TouchableOpacity>
-                                        <Text style={[dynamicStyles.moreLink, { color: colors.primary }]}>View More...</Text>
-                                    </TouchableOpacity>
-                                </View>
-                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={dynamicStyles.horizontalScroll}>
-                                    {onionProducts.map((product) => (
-                                        <TouchableOpacity key={product.id} style={[dynamicStyles.productCard, { backgroundColor: colors.surface }]}>
-                                            <View style={[dynamicStyles.productImageContainer, { backgroundColor: colors.border }]}>
-                                                <Text style={dynamicStyles.productEmoji}>{product.image}</Text>
-                                            </View>
-                                            <Text style={[dynamicStyles.productStore, { color: colors.textSecondary }]}>{product.store}</Text>
-                                            <Text style={[dynamicStyles.productName, { color: colors.text }]}>{product.name}</Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </ScrollView>
-                            </View>
-                        </>
+                        <View style={dynamicStyles.emptyContainer}>
+                            <Text style={dynamicStyles.emptyIcon}>🛍️</Text>
+                            <Text style={[dynamicStyles.emptyText, { color: colors.text }]}>
+                                Select a category to view products
+                            </Text>
+                        </View>
                     )}
 
                     {/* Category Products Section - Show real products from database when category is selected */}
@@ -278,6 +204,7 @@ const UserShopScreen = () => {
                                         <TouchableOpacity 
                                             key={product.id} 
                                             style={[dynamicStyles.productCard, { backgroundColor: colors.surface }]}
+                                            onPress={() => handleProductPress(product)}
                                         >
                                             <View style={[dynamicStyles.productImageContainer, { backgroundColor: colors.border }]}>
                                                 {product.image_url ? (
@@ -319,6 +246,11 @@ const UserShopScreen = () => {
                     )}
                 </View>
             </ScrollView>
+            <ProductDetailModal
+                visible={modalVisible}
+                product={selectedProduct}
+                onClose={handleCloseModal}
+            />
         </SafeAreaView>
     );
 };
