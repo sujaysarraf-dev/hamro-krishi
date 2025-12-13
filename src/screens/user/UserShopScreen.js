@@ -13,7 +13,9 @@ const UserShopScreen = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
     const [products, setProducts] = useState([]);
+    const [searchResults, setSearchResults] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [searchLoading, setSearchLoading] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [modalVisible, setModalVisible] = useState(false);
     const [organicFilter, setOrganicFilter] = useState(false);
@@ -27,6 +29,14 @@ const UserShopScreen = () => {
             setProducts([]);
         }
     }, [selectedCategory, organicFilter]);
+
+    useEffect(() => {
+        if (searchQuery.trim().length > 0) {
+            searchProducts();
+        } else {
+            setSearchResults([]);
+        }
+    }, [searchQuery]);
 
     useFocusEffect(
         React.useCallback(() => {
@@ -91,6 +101,62 @@ const UserShopScreen = () => {
         }
     };
 
+    const searchProducts = async () => {
+        try {
+            setSearchLoading(true);
+            
+            // Build search query - search in product name and description
+            let query = supabase
+                .from('products')
+                .select('*')
+                .eq('status', 'Active')
+                .ilike('name', `%${searchQuery}%`);
+            
+            // Add organic filter if enabled
+            if (organicFilter) {
+                query = query.eq('is_organic', true);
+            }
+            
+            const { data: productsData, error: productsError } = await query
+                .order('created_at', { ascending: false })
+                .limit(50);
+
+            if (productsError) {
+                console.error('Error searching products:', productsError);
+                throw productsError;
+            }
+
+            // Fetch farmer profiles for the products
+            if (productsData && productsData.length > 0) {
+                const farmerIds = [...new Set(productsData.map(p => p.farmer_id))];
+                const { data: profilesData, error: profilesError } = await supabase
+                    .from('user_profiles')
+                    .select('id, full_name, phone')
+                    .in('id', farmerIds);
+
+                if (profilesError) {
+                    console.error('Error loading profiles:', profilesError);
+                }
+
+                // Combine products with profiles
+                const productsWithProfiles = productsData.map(product => ({
+                    ...product,
+                    user_profiles: profilesData?.find(p => p.id === product.farmer_id) || null
+                }));
+
+                setSearchResults(productsWithProfiles);
+            } else {
+                setSearchResults([]);
+            }
+
+        } catch (error) {
+            console.error('Error searching products:', error);
+            setSearchResults([]);
+        } finally {
+            setSearchLoading(false);
+        }
+    };
+
     const formatPrice = (price) => {
         return new Intl.NumberFormat('en-NP', {
             minimumFractionDigits: 0,
@@ -99,14 +165,15 @@ const UserShopScreen = () => {
     };
 
     const filteredProducts = products.filter(product => {
-        if (searchQuery && !product.name.toLowerCase().includes(searchQuery.toLowerCase())) {
-            return false;
-        }
         if (organicFilter && !product.is_organic) {
             return false;
         }
         return true;
     });
+
+    // Determine which products to display
+    const displayProducts = searchQuery.trim().length > 0 ? searchResults : filteredProducts;
+    const isLoading = searchQuery.trim().length > 0 ? searchLoading : loading;
 
     const handleProductPress = (product) => {
         setSelectedProduct(product);
@@ -217,8 +284,75 @@ const UserShopScreen = () => {
                         </ScrollView>
                     </View>
 
-                    {/* All Products Section - Show empty when "All" is selected */}
-                    {selectedCategory === 'all' && (
+                    {/* Search Results Section - Show when search query is active */}
+                    {searchQuery.trim().length > 0 && (
+                        <View style={dynamicStyles.section}>
+                            <View style={dynamicStyles.sectionHeader}>
+                                <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>
+                                    Search Results
+                                </Text>
+                                <Text style={[dynamicStyles.searchResultCount, { color: colors.textSecondary }]}>
+                                    {displayProducts.length} found
+                                </Text>
+                            </View>
+                            {isLoading ? (
+                                <View style={dynamicStyles.loadingContainer}>
+                                    <ActivityIndicator size="large" color={colors.primary} />
+                                </View>
+                            ) : displayProducts.length > 0 ? (
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={dynamicStyles.horizontalScroll}>
+                                    {displayProducts.map((product) => (
+                                        <TouchableOpacity 
+                                            key={product.id} 
+                                            style={[dynamicStyles.productCard, { backgroundColor: colors.surface }]}
+                                            onPress={() => handleProductPress(product)}
+                                        >
+                                            <View style={[dynamicStyles.productImageContainer, { backgroundColor: colors.border }]}>
+                                                {product.image_url ? (
+                                                    <Image 
+                                                        source={{ uri: product.image_url }} 
+                                                        style={dynamicStyles.productImage}
+                                                        resizeMode="cover"
+                                                    />
+                                                ) : (
+                                                    <Text style={dynamicStyles.productEmoji}>🌾</Text>
+                                                )}
+                                            </View>
+                                            <View style={dynamicStyles.productNameRow}>
+                                                <Text style={[dynamicStyles.productName, { color: colors.text }]} numberOfLines={1}>
+                                                    {product.name}
+                                                </Text>
+                                                {product.is_organic && (
+                                                    <View style={[dynamicStyles.organicBadge, { backgroundColor: '#4CAF50' + '20' }]}>
+                                                        <Text style={[dynamicStyles.organicBadgeText, { color: '#4CAF50' }]}>🌿</Text>
+                                                    </View>
+                                                )}
+                                            </View>
+                                            <Text style={[dynamicStyles.productStore, { color: colors.textSecondary }]} numberOfLines={1}>
+                                                {product.user_profiles?.full_name || 'Farmer'}
+                                            </Text>
+                                            <Text style={[dynamicStyles.productPrice, { color: colors.primary }]}>
+                                                NPR {formatPrice(product.price)} / {product.stock_unit || 'kilograms'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            ) : (
+                                <View style={dynamicStyles.emptyContainer}>
+                                    <Text style={dynamicStyles.emptyIcon}>🔍</Text>
+                                    <Text style={[dynamicStyles.emptyText, { color: colors.text }]}>
+                                        No products found
+                                    </Text>
+                                    <Text style={[dynamicStyles.emptySubtext, { color: colors.textSecondary }]}>
+                                        Try a different search term
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+                    )}
+
+                    {/* All Products Section - Show empty when "All" is selected and no search */}
+                    {selectedCategory === 'all' && searchQuery.trim().length === 0 && (
                         <View style={dynamicStyles.emptyContainer}>
                             <Text style={dynamicStyles.emptyIcon}>🛍️</Text>
                             <Text style={[dynamicStyles.emptyText, { color: colors.text }]}>
@@ -227,21 +361,21 @@ const UserShopScreen = () => {
                         </View>
                     )}
 
-                    {/* Category Products Section - Show real products from database when category is selected */}
-                    {selectedCategory !== 'all' && (
+                    {/* Category Products Section - Show real products from database when category is selected and no search */}
+                    {selectedCategory !== 'all' && searchQuery.trim().length === 0 && (
                         <View style={dynamicStyles.section}>
                             <View style={dynamicStyles.sectionHeader}>
                                 <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>
                                     {selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}
                                 </Text>
                             </View>
-                            {loading ? (
+                            {isLoading ? (
                                 <View style={dynamicStyles.loadingContainer}>
                                     <ActivityIndicator size="large" color={colors.primary} />
                                 </View>
-                            ) : filteredProducts.length > 0 ? (
+                            ) : displayProducts.length > 0 ? (
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={dynamicStyles.horizontalScroll}>
-                                    {filteredProducts.map((product) => (
+                                    {displayProducts.map((product) => (
                                         <TouchableOpacity 
                                             key={product.id} 
                                             style={[dynamicStyles.productCard, { backgroundColor: colors.surface }]}
@@ -429,7 +563,7 @@ const getStyles = (colors, isDark) => StyleSheet.create({
         fontSize: 16,
         fontWeight: '700',
         color: colors.text,
-        marginBottom: 4,
+        flex: 1,
     },
     productStore: {
         fontSize: 12,
@@ -472,6 +606,25 @@ const getStyles = (colors, isDark) => StyleSheet.create({
     },
     emptySubtext: {
         fontSize: 14,
+    },
+    searchResultCount: {
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    productNameRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 4,
+    },
+    organicBadge: {
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+        marginLeft: 8,
+    },
+    organicBadgeText: {
+        fontSize: 12,
     },
 });
 
