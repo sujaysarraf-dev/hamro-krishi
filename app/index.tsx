@@ -58,14 +58,24 @@ export default function Index() {
                 // User is logged in, get their profile to determine role
                 const { data: profile, error: profileError } = await supabase
                     .from('user_profiles')
-                    .select('role')
+                    .select('role, interests')
                     .eq('id', session.user.id)
                     .maybeSingle();
 
                 console.log('Profile check:', { role: profile?.role, error: profileError });
 
                 // Set redirect target based on role
-                const targetRoute = profile?.role === 'farmer' ? '/farmer-interests' : '/user-dashboard';
+                let targetRoute;
+                if (profile?.role === 'farmer') {
+                    // Check if farmer has interests set
+                    const hasInterests = profile?.interests && 
+                        (Array.isArray(profile.interests) ? profile.interests.length > 0 : 
+                         typeof profile.interests === 'string' ? profile.interests !== '[]' : 
+                         Object.keys(profile.interests || {}).length > 0);
+                    targetRoute = hasInterests ? '/farmer-dashboard' : '/farmer-interests';
+                } else {
+                    targetRoute = '/user-dashboard';
+                }
                 console.log('Redirecting to:', targetRoute);
                 
                 // Set redirect state and navigate

@@ -103,7 +103,7 @@ const FarmerInterestScreen = () => {
                 title: 'Success',
                 message: 'Your interests have been saved successfully!',
                 onConfirm: () => {
-                    router.replace('/');
+                    router.replace('/farmer-dashboard');
                 }
             });
         } catch (error) {

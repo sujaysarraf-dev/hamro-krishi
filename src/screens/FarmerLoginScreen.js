@@ -67,8 +67,20 @@ const FarmerLoginScreen = () => {
                     console.error('Error saving profile:', profileError);
                 }
 
-                // Navigate immediately after successful login
-                router.replace('/farmer-interests');
+                // Check if farmer has interests set
+                const { data: profile } = await supabase
+                    .from('user_profiles')
+                    .select('interests')
+                    .eq('id', user.id)
+                    .maybeSingle();
+
+                const hasInterests = profile?.interests && 
+                    (Array.isArray(profile.interests) ? profile.interests.length > 0 : 
+                     typeof profile.interests === 'string' ? profile.interests !== '[]' : 
+                     Object.keys(profile.interests || {}).length > 0);
+
+                // Navigate based on whether interests are set
+                router.replace(hasInterests ? '/farmer-dashboard' : '/farmer-interests');
                 
                 // Show success alert (but navigation already happened)
                 setAlert({
