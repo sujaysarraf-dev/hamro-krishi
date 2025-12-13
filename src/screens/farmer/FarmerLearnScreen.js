@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import * as Animatable from 'react-native-animatable';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Conditionally import expo-video - it may not work on web
 let VideoView = null;
@@ -36,6 +37,8 @@ const FarmerLearnScreen = ({ onNavigateBack }) => {
     const [completedSteps, setCompletedSteps] = useState({});
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
+    const [showProgressModal, setShowProgressModal] = useState(false);
+    const [savedProgress, setSavedProgress] = useState(0);
     const modalScale = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
@@ -55,15 +58,20 @@ const FarmerLearnScreen = ({ onNavigateBack }) => {
     // Update video source when crop changes
     useEffect(() => {
         if (selectedCrop?.hasVideo && selectedCrop?.videoPath) {
+            // require() returns a number (asset ID) for local files
+            // expo-video can handle this directly
             setVideoSource(selectedCrop.videoPath);
+            setVideoLoading(true);
+            setVideoError(false);
         } else {
             setVideoSource(null);
+            setVideoLoading(false);
         }
     }, [selectedCrop]);
 
     // Create video player instance - always call hook to follow React rules
     // useVideoPlayer is always defined (fallback function on web)
-    const videoPlayer = useVideoPlayer(videoSource || null, (player) => {
+    const videoPlayer = useVideoPlayer(videoSource, (player) => {
         if (player && videoSource) {
             player.loop = false;
             player.muted = false;
@@ -77,16 +85,6 @@ const FarmerLearnScreen = ({ onNavigateBack }) => {
     const [isFullscreen, setIsFullscreen] = useState(false);
 
     useEffect(() => {
-        // Reset video state when modal opens
-        if (showCropModal && selectedCrop?.hasVideo && videoSource) {
-            setVideoError(false);
-            setVideoLoading(true);
-            setIsPlaying(false);
-            if (videoPlayer) {
-                videoPlayer.pause();
-                videoPlayer.seekTo(0);
-            }
-        }
         // Initialize modal scale
         if (showCropModal) {
             modalScale.setValue(0);
@@ -96,28 +94,64 @@ const FarmerLearnScreen = ({ onNavigateBack }) => {
                 tension: 50,
                 friction: 7,
             }).start();
+            
+            // Reset video state when modal opens
+            if (selectedCrop?.hasVideo && videoSource) {
+                setVideoError(false);
+                setVideoLoading(true);
+                setIsPlaying(false);
+            }
         } else {
             modalScale.setValue(0);
+            // Reset video when modal closes
+            if (videoPlayer) {
+                try {
+                    videoPlayer.pause();
+                    videoPlayer.seekTo(0);
+                } catch (e) {
+                    console.warn('Error resetting video:', e);
+                }
+            }
         }
-    }, [showCropModal, selectedCrop, videoSource, videoPlayer]);
+    }, [showCropModal, selectedCrop, videoSource]);
 
     // Listen to player status changes
     useEffect(() => {
-        if (!videoPlayer || !videoSource) return;
+        if (!videoPlayer || !videoSource) {
+            setVideoLoading(false);
+            return;
+        }
 
-        const subscription = videoPlayer.addListener('statusChange', (status) => {
-            setIsPlaying(status.isPlaying);
-            if (status.status === 'readyToPlay') {
+        // Set up status listener
+        const statusListener = videoPlayer.addListener('statusChange', (status) => {
+            console.log('Video status changed:', status);
+            if (status.isPlaying !== undefined) {
+                setIsPlaying(status.isPlaying);
+            }
+            if (status.status === 'readyToPlay' || status.status === 'playing') {
                 setVideoLoading(false);
                 setVideoError(false);
             } else if (status.status === 'error') {
+                console.error('Video error status:', status);
                 setVideoError(true);
                 setVideoLoading(false);
             }
         });
 
+        // Also listen for load events
+        const loadListener = videoPlayer.addListener('load', () => {
+            console.log('Video loaded');
+            setVideoLoading(false);
+            setVideoError(false);
+        });
+
+        // Set initial loading state
+        setVideoLoading(true);
+        setVideoError(false);
+
         return () => {
-            subscription.remove();
+            if (statusListener) statusListener.remove();
+            if (loadListener) loadListener.remove();
         };
     }, [videoPlayer, videoSource]);
 
@@ -385,14 +419,27 @@ const FarmerLearnScreen = ({ onNavigateBack }) => {
         }
     ];
 
-    const handleCropPress = (crop) => {
+    const handleCropPress = async (crop) => {
         setSelectedCrop(crop);
         setShowCropModal(true);
         setVideoError(false);
         setVideoLoading(true);
-        // Reset expanded topics and completed steps for new crop
+        // Reset expanded topics for new crop
         setExpandedTopics({});
-        setCompletedSteps({});
+        
+        // Load saved progress for this crop
+        try {
+            const savedData = await AsyncStorage.getItem(`learning_progress_${crop.id}`);
+            if (savedData) {
+                const progress = JSON.parse(savedData);
+                setCompletedSteps(progress.completedSteps || {});
+            } else {
+                setCompletedSteps({});
+            }
+        } catch (error) {
+            console.error('Error loading progress:', error);
+            setCompletedSteps({});
+        }
     };
 
     const handleCloseModal = () => {
@@ -444,6 +491,32 @@ const FarmerLearnScreen = ({ onNavigateBack }) => {
         return totalSteps > 0 ? Math.round((completed / totalSteps) * 100) : 0;
     };
 
+    const handleSaveAndContinue = async () => {
+        if (!selectedCrop) return;
+        
+        const progress = getOverallProgress();
+        setSavedProgress(progress);
+        
+        try {
+            // Save progress to AsyncStorage
+            await AsyncStorage.setItem(`learning_progress_${selectedCrop.id}`, JSON.stringify({
+                completedSteps,
+                progress,
+                lastUpdated: new Date().toISOString(),
+            }));
+            
+            // Show progress modal
+            setShowProgressModal(true);
+            
+            // Auto-hide after 3 seconds
+            setTimeout(() => {
+                setShowProgressModal(false);
+            }, 3000);
+        } catch (error) {
+            console.error('Error saving progress:', error);
+        }
+    };
+
     // Filter crops based on search and category
     const filteredCrops = crops.filter(crop => {
         const matchesSearch = crop.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -452,12 +525,17 @@ const FarmerLearnScreen = ({ onNavigateBack }) => {
     });
 
     const handleVideoLoad = () => {
+        console.log('Video load event');
         setVideoLoading(false);
         setVideoError(false);
+        if (videoPlayer) {
+            // Video is ready, but don't auto-play
+            setIsPlaying(false);
+        }
     };
 
     const handleVideoError = (error) => {
-        console.error('Video error:', error);
+        console.error('Video error event:', error);
         setVideoError(true);
         setVideoLoading(false);
     };
@@ -679,36 +757,37 @@ const FarmerLearnScreen = ({ onNavigateBack }) => {
                                                     <Text style={dynamicStyles.retryButtonText}>Retry</Text>
                                                 </TouchableOpacity>
                                             </View>
+                                        ) : Platform.OS === 'web' ? (
+                                            <View style={dynamicStyles.videoErrorContainer}>
+                                                <Text style={dynamicStyles.videoErrorIcon}>📹</Text>
+                                                <Text style={[dynamicStyles.videoErrorText, { color: colors.textSecondary }]}>
+                                                    Video playback is not available on web. Please use the mobile app to view videos.
+                                                </Text>
+                                            </View>
                                         ) : videoPlayer && videoSource && VideoView ? (
                                             <View style={dynamicStyles.videoWrapper}>
                                                 <VideoView
                                                     player={videoPlayer}
                                                     style={dynamicStyles.video}
-                                                    nativeControls={isFullscreen}
+                                                    nativeControls={true}
                                                     contentFit="contain"
                                                     allowsFullscreen={true}
                                                     allowsPictureInPicture={false}
-                                                    onLoadStart={() => setVideoLoading(true)}
-                                                    onLoad={handleVideoLoad}
-                                                    onError={handleVideoError}
                                                 />
-                                                {!isFullscreen && !videoLoading && !videoError && (
-                                                    <TouchableOpacity
-                                                        style={dynamicStyles.playButtonOverlay}
-                                                        onPress={handlePlayButtonPress}
-                                                        activeOpacity={0.8}
-                                                    >
-                                                        <View style={dynamicStyles.playButton}>
-                                                            <Text style={dynamicStyles.playButtonIcon}>▶</Text>
-                                                        </View>
-                                                    </TouchableOpacity>
+                                                {videoLoading && (
+                                                    <View style={dynamicStyles.videoLoadingOverlay}>
+                                                        <ActivityIndicator size="large" color="#FFFFFF" />
+                                                        <Text style={dynamicStyles.videoLoadingTextOverlay}>
+                                                            Loading video...
+                                                        </Text>
+                                                    </View>
                                                 )}
                                             </View>
                                         ) : (
                                             <View style={dynamicStyles.videoErrorContainer}>
                                                 <Text style={dynamicStyles.videoErrorIcon}>⚠️</Text>
                                                 <Text style={[dynamicStyles.videoErrorText, { color: colors.textSecondary }]}>
-                                                    Video player not available
+                                                    Video player not available. Please ensure expo-video is installed.
                                                 </Text>
                                             </View>
                                         )}
@@ -888,8 +967,58 @@ const FarmerLearnScreen = ({ onNavigateBack }) => {
                                     );
                                 })}
                             </View>
+
+                            {/* Save and Continue Button */}
+                            <View style={dynamicStyles.saveButtonContainer}>
+                                <TouchableOpacity
+                                    style={[dynamicStyles.saveButton, { backgroundColor: colors.primary }]}
+                                    onPress={handleSaveAndContinue}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={dynamicStyles.saveButtonText}>💾 Save and Continue</Text>
+                                </TouchableOpacity>
+                            </View>
                         </ScrollView>
                     </Animated.View>
+                </View>
+            </Modal>
+
+            {/* Progress Modal */}
+            <Modal
+                visible={showProgressModal}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowProgressModal(false)}
+            >
+                <View style={dynamicStyles.progressModalOverlay}>
+                    <Animatable.View
+                        animation="bounceIn"
+                        style={[dynamicStyles.progressModalContent, { backgroundColor: colors.card }]}
+                    >
+                        <View style={[dynamicStyles.progressModalIcon, { backgroundColor: colors.primary + '20' }]}>
+                            <Text style={dynamicStyles.progressModalIconText}>✓</Text>
+                        </View>
+                        <Text style={[dynamicStyles.progressModalTitle, { color: colors.text }]}>
+                            Progress Saved!
+                        </Text>
+                        <Text style={[dynamicStyles.progressModalSubtitle, { color: colors.textSecondary }]}>
+                            You have completed
+                        </Text>
+                        <View style={[dynamicStyles.progressModalProgressContainer, { backgroundColor: colors.surface, borderColor: colors.primary }]}>
+                            <Text style={[dynamicStyles.progressModalProgressText, { color: colors.primary }]}>
+                                {savedProgress}%
+                            </Text>
+                        </View>
+                        <Text style={[dynamicStyles.progressModalMessage, { color: colors.textSecondary }]}>
+                            of {selectedCrop?.name} farming guide
+                        </Text>
+                        <TouchableOpacity
+                            style={[dynamicStyles.progressModalButton, { backgroundColor: colors.primary }]}
+                            onPress={() => setShowProgressModal(false)}
+                        >
+                            <Text style={dynamicStyles.progressModalButtonText}>Continue Learning</Text>
+                        </TouchableOpacity>
+                    </Animatable.View>
                 </View>
             </Modal>
         </SafeAreaView>
@@ -1433,6 +1562,94 @@ const getStyles = (colors, isDark) => StyleSheet.create({
     stepText: {
         fontSize: 14,
         lineHeight: 20,
+    },
+    saveButtonContainer: {
+        marginTop: 20,
+        marginBottom: 10,
+        paddingHorizontal: 20,
+    },
+    saveButton: {
+        paddingVertical: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 4,
+    },
+    saveButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    progressModalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    progressModalContent: {
+        borderRadius: 24,
+        padding: 30,
+        width: '85%',
+        maxWidth: 350,
+        alignItems: 'center',
+    },
+    progressModalIcon: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    progressModalIconText: {
+        fontSize: 48,
+        color: '#4CAF50',
+        fontWeight: 'bold',
+    },
+    progressModalTitle: {
+        fontSize: 24,
+        fontWeight: '700',
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    progressModalSubtitle: {
+        fontSize: 16,
+        marginBottom: 16,
+        textAlign: 'center',
+    },
+    progressModalProgressContainer: {
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 16,
+        borderWidth: 4,
+    },
+    progressModalProgressText: {
+        fontSize: 36,
+        fontWeight: '700',
+    },
+    progressModalMessage: {
+        fontSize: 14,
+        marginBottom: 24,
+        textAlign: 'center',
+    },
+    progressModalButton: {
+        paddingVertical: 12,
+        paddingHorizontal: 32,
+        borderRadius: 12,
+        width: '100%',
+        alignItems: 'center',
+    },
+    progressModalButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '600',
     },
 });
 
