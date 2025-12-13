@@ -1,10 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Modal, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
+import { useRouter } from 'expo-router';
 import { supabase } from '../../config/supabase';
 
-const FarmerCropCalendarScreen = () => {
+const FarmerCropCalendarScreen = ({ onNavigateBack }) => {
+    const router = useRouter();
+
+    useEffect(() => {
+        const backAction = () => {
+            if (onNavigateBack) {
+                onNavigateBack();
+            } else {
+                router.back();
+            }
+            return true; // Prevent default back behavior
+        };
+
+        const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+        return () => backHandler.remove();
+    }, [onNavigateBack]);
     const { colors, isDark } = useTheme();
     const dynamicStyles = getStyles(colors, isDark);
     const [loading, setLoading] = useState(true);
@@ -103,7 +119,20 @@ const FarmerCropCalendarScreen = () => {
     return (
         <SafeAreaView style={[dynamicStyles.container, { backgroundColor: colors.background }]}>
             <View style={[dynamicStyles.header, { borderBottomColor: colors.border }]}>
+                <TouchableOpacity 
+                    onPress={() => {
+                        if (onNavigateBack) {
+                            onNavigateBack();
+                        } else {
+                            router.back();
+                        }
+                    }}
+                    style={dynamicStyles.backButton}
+                >
+                    <Text style={[dynamicStyles.backButtonText, { color: colors.primary }]}>← Back</Text>
+                </TouchableOpacity>
                 <Text style={[dynamicStyles.headerTitle, { color: colors.text }]}>Crop Calendar</Text>
+                <View style={dynamicStyles.placeholder} />
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -389,14 +418,30 @@ const getStyles = (colors, isDark) => StyleSheet.create({
         flex: 1,
     },
     header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
         paddingHorizontal: 20,
         paddingTop: 20,
         paddingBottom: 16,
         borderBottomWidth: 1,
     },
+    backButton: {
+        paddingVertical: 8,
+        paddingRight: 12,
+    },
+    backButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
+    },
     headerTitle: {
         fontSize: 28,
         fontWeight: '700',
+        flex: 1,
+        textAlign: 'center',
+    },
+    placeholder: {
+        width: 60,
     },
     loadingContainer: {
         flex: 1,

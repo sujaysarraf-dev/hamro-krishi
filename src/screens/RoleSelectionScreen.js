@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, BackHandler, Alert, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
@@ -9,6 +9,17 @@ const { width } = Dimensions.get('window');
 const RoleSelectionScreen = () => {
     const router = useRouter();
     const [selectedRole, setSelectedRole] = useState('Farmer');
+
+    useEffect(() => {
+        const backAction = () => {
+            // Go back to welcome screen
+            router.back();
+            return true; // Prevent default back behavior
+        };
+
+        const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+        return () => backHandler.remove();
+    }, []);
 
     return (
         <SafeAreaView style={styles.container}>

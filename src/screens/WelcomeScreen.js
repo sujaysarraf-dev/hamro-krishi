@@ -1,6 +1,6 @@
 
-import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, BackHandler, Alert, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
@@ -8,6 +8,39 @@ const { width } = Dimensions.get('window');
 
 const WelcomeScreen = () => {
     const router = useRouter();
+
+    useEffect(() => {
+        const backAction = () => {
+            // Show quit confirmation on welcome screen
+            Alert.alert(
+                'Exit App',
+                'Do you want to quit?',
+                [
+                    {
+                        text: 'Cancel',
+                        onPress: () => null,
+                        style: 'cancel',
+                    },
+                    {
+                        text: 'Quit',
+                        onPress: () => {
+                            if (Platform.OS === 'android') {
+                                BackHandler.exitApp();
+                            } else {
+                                // For iOS, we can't exit programmatically
+                                Alert.alert('Info', 'Please use the home button to exit the app.');
+                            }
+                        },
+                    },
+                ],
+                { cancelable: false }
+            );
+            return true; // Prevent default back behavior
+        };
+
+        const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+        return () => backHandler.remove();
+    }, []);
 
     return (
         <SafeAreaView style={styles.container}>

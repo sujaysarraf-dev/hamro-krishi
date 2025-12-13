@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, BackHandler, Alert, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import UserHomeScreen from './UserHomeScreen';
@@ -10,6 +10,46 @@ import UserProfileScreen from './UserProfileScreen';
 const UserDashboardScreen = () => {
     const { colors, isDark } = useTheme();
     const [activeTab, setActiveTab] = useState('home');
+
+    useEffect(() => {
+        const backAction = () => {
+            if (activeTab === 'home') {
+                // Show quit confirmation when on home tab
+                Alert.alert(
+                    'Exit App',
+                    'Do you want to quit?',
+                    [
+                        {
+                            text: 'Cancel',
+                            onPress: () => null,
+                            style: 'cancel',
+                        },
+                        {
+                            text: 'Quit',
+                            onPress: () => {
+                                if (Platform.OS === 'android') {
+                                    BackHandler.exitApp();
+                                } else {
+                                    // For iOS, we can't exit programmatically, but we can show a message
+                                    Alert.alert('Info', 'Please use the home button to exit the app.');
+                                }
+                            },
+                        },
+                    ],
+                    { cancelable: false }
+                );
+                return true; // Prevent default back behavior
+            } else {
+                // Navigate to home tab if on other tabs
+                setActiveTab('home');
+                return true; // Prevent default back behavior
+            }
+        };
+
+        const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+
+        return () => backHandler.remove();
+    }, [activeTab]);
 
     const renderScreen = () => {
         switch (activeTab) {

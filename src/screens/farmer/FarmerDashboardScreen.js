@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, BackHandler, Alert, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import FarmerHomeScreen from './FarmerHomeScreen';
@@ -14,6 +14,54 @@ const FarmerDashboardScreen = () => {
     const { colors, isDark } = useTheme();
     const [activeTab, setActiveTab] = useState('home');
 
+    useEffect(() => {
+        const backAction = () => {
+            // Check if we're on a main tab (home, products, discussion, orders, profile)
+            const mainTabs = ['home', 'products', 'discussion', 'orders', 'profile'];
+            const isMainTab = mainTabs.includes(activeTab);
+            
+            if (activeTab === 'home') {
+                // Show quit confirmation when on home tab
+                Alert.alert(
+                    'Exit App',
+                    'Do you want to quit?',
+                    [
+                        {
+                            text: 'Cancel',
+                            onPress: () => null,
+                            style: 'cancel',
+                        },
+                        {
+                            text: 'Quit',
+                            onPress: () => {
+                                if (Platform.OS === 'android') {
+                                    BackHandler.exitApp();
+                                } else {
+                                    // For iOS, we can't exit programmatically, but we can show a message
+                                    Alert.alert('Info', 'Please use the home button to exit the app.');
+                                }
+                            },
+                        },
+                    ],
+                    { cancelable: false }
+                );
+                return true; // Prevent default back behavior
+            } else if (isMainTab) {
+                // Navigate to home tab if on other main tabs
+                setActiveTab('home');
+                return true; // Prevent default back behavior
+            } else {
+                // For weather/calendar tabs, navigate to home
+                setActiveTab('home');
+                return true;
+            }
+        };
+
+        const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+
+        return () => backHandler.remove();
+    }, [activeTab]);
+
     const renderScreen = () => {
         switch (activeTab) {
             case 'home':
@@ -26,9 +74,9 @@ const FarmerDashboardScreen = () => {
             case 'discussion':
                 return <FarmerDiscussionScreen />;
             case 'weather':
-                return <FarmerWeatherScreen />;
+                return <FarmerWeatherScreen onNavigateBack={() => setActiveTab('home')} />;
             case 'calendar':
-                return <FarmerCropCalendarScreen />;
+                return <FarmerCropCalendarScreen onNavigateBack={() => setActiveTab('home')} />;
             case 'orders':
                 return <FarmerHistoryScreen />;
             case 'profile':
