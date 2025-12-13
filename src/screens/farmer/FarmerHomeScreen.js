@@ -9,7 +9,7 @@ import * as Location from 'expo-location';
 const { width } = Dimensions.get('window');
 const WEATHERBIT_API_KEY = 'b6d691f2b36741c0b7d036f5c88b7d30';
 
-const FarmerHomeScreen = ({ onNavigateToWeather, onNavigateToCalendar }) => {
+const FarmerHomeScreen = ({ onNavigateToWeather, onNavigateToCalendar, onNavigateToLearn }) => {
     const { colors, isDark } = useTheme();
     const dynamicStyles = getStyles(colors, isDark);
     const [searchQuery, setSearchQuery] = useState('');
@@ -281,13 +281,6 @@ const FarmerHomeScreen = ({ onNavigateToWeather, onNavigateToCalendar }) => {
         }
     };
 
-    const commodities = [
-        { id: 1, name: 'Rice', icon: '🌾' },
-        { id: 2, name: 'Corn', icon: '🌽' },
-        { id: 3, name: 'Grapes', icon: '🍇' },
-        { id: 4, name: 'Potato', icon: '🥔' },
-        { id: 5, name: 'Olive', icon: '🫒' },
-    ];
 
     return (
         <SafeAreaView style={[dynamicStyles.container, { backgroundColor: colors.background }]} edges={['top']}>
@@ -417,27 +410,6 @@ const FarmerHomeScreen = ({ onNavigateToWeather, onNavigateToCalendar }) => {
                         )}
                     </TouchableOpacity>
 
-                    {/* Commodities and Food Section */}
-                    <View style={dynamicStyles.section}>
-                        <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>Commodities and Food</Text>
-                        <ScrollView 
-                            horizontal 
-                            showsHorizontalScrollIndicator={false} 
-                            style={dynamicStyles.commoditiesScroll}
-                            contentContainerStyle={dynamicStyles.commoditiesContent}
-                        >
-                            {commodities.map((commodity) => (
-                                <TouchableOpacity 
-                                    key={commodity.id} 
-                                    style={[dynamicStyles.commodityCard, { backgroundColor: colors.card }]}
-                                >
-                                    <Text style={dynamicStyles.commodityIcon}>{commodity.icon}</Text>
-                                    <Text style={[dynamicStyles.commodityName, { color: colors.text }]}>{commodity.name}</Text>
-                                </TouchableOpacity>
-                            ))}
-                        </ScrollView>
-                    </View>
-
                     {/* Quick Access Section */}
                     <View style={dynamicStyles.section}>
                         <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>Quick Access</Text>
@@ -461,6 +433,28 @@ const FarmerHomeScreen = ({ onNavigateToWeather, onNavigateToCalendar }) => {
                                 <Text style={[dynamicStyles.quickAccessText, { color: colors.text }]}>Crop Calendar</Text>
                             </TouchableOpacity>
                         </View>
+                    </View>
+
+                    {/* Learn Farming Section */}
+                    <View style={dynamicStyles.section}>
+                        <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>Learn Farming</Text>
+                        <TouchableOpacity 
+                            style={[dynamicStyles.learnCard, { backgroundColor: colors.card }]}
+                            onPress={() => {
+                                if (onNavigateToLearn) onNavigateToLearn();
+                            }}
+                        >
+                            <View style={dynamicStyles.learnCardContent}>
+                                <Text style={dynamicStyles.learnIcon}>📚</Text>
+                                <View style={dynamicStyles.learnTextContainer}>
+                                    <Text style={[dynamicStyles.learnTitle, { color: colors.text }]}>Crop-Wise Farming Guide</Text>
+                                    <Text style={[dynamicStyles.learnDescription, { color: colors.textSecondary }]}>
+                                        Learn comprehensive farming techniques for different crops
+                                    </Text>
+                                </View>
+                                <Text style={[dynamicStyles.learnArrow, { color: colors.primary }]}>›</Text>
+                            </View>
+                        </TouchableOpacity>
                     </View>
                 </View>
             </ScrollView>
@@ -885,36 +879,6 @@ const getStyles = (colors, isDark) => StyleSheet.create({
         color: colors.text,
         marginBottom: 16,
     },
-    commoditiesScroll: {
-        marginHorizontal: -20,
-        paddingHorizontal: 20,
-    },
-    commoditiesContent: {
-        paddingRight: 20,
-    },
-    commodityCard: {
-        width: 100,
-        height: 100,
-        borderRadius: 12,
-        backgroundColor: colors.card,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
-    },
-    commodityIcon: {
-        fontSize: 40,
-        marginBottom: 8,
-    },
-    commodityName: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: colors.text,
-    },
     quickAccessGrid: {
         flexDirection: 'row',
         gap: 12,
@@ -935,6 +899,36 @@ const getStyles = (colors, isDark) => StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
         textAlign: 'center',
+    },
+    learnCard: {
+        borderRadius: 12,
+        padding: 20,
+        marginTop: 8,
+    },
+    learnCardContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    learnIcon: {
+        fontSize: 40,
+        marginRight: 16,
+    },
+    learnTextContainer: {
+        flex: 1,
+    },
+    learnTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        marginBottom: 4,
+    },
+    learnDescription: {
+        fontSize: 14,
+        lineHeight: 20,
+    },
+    learnArrow: {
+        fontSize: 24,
+        fontWeight: '600',
+        marginLeft: 12,
     },
     modalOverlay: {
         flex: 1,
