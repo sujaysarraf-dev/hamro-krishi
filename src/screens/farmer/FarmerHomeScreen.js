@@ -6,6 +6,7 @@ import { useFocusEffect } from 'expo-router';
 import { supabase } from '../../config/supabase';
 import * as Location from 'expo-location';
 import { reverseGeocode } from '../../utils/geocoding';
+import NotificationsModal from '../../components/NotificationsModal';
 
 const { width } = Dimensions.get('window');
 const WEATHERBIT_API_KEY = 'b6d691f2b36741c0b7d036f5c88b7d30';
@@ -22,6 +23,7 @@ const FarmerHomeScreen = ({ onNavigateToWeather, onNavigateToCalendar, onNavigat
     const [weatherData, setWeatherData] = useState(null);
     const [detailedWeatherData, setDetailedWeatherData] = useState(null);
     const [showWeatherModal, setShowWeatherModal] = useState(false);
+    const [showNotifications, setShowNotifications] = useState(false);
     
     // Get current date formatted
     const getFormattedDate = () => {
@@ -349,11 +351,10 @@ const FarmerHomeScreen = ({ onNavigateToWeather, onNavigateToCalendar, onNavigat
                         </View>
                     </View>
                     <TouchableOpacity 
-                        style={dynamicStyles.refreshButton}
-                        onPress={handleRefresh}
-                        disabled={weatherLoading}
+                        style={dynamicStyles.notificationButton}
+                        onPress={() => setShowNotifications(true)}
                     >
-                        <Text style={dynamicStyles.refreshIcon}>🔄</Text>
+                        <Text style={dynamicStyles.notificationIcon}>🔔</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -751,6 +752,11 @@ const FarmerHomeScreen = ({ onNavigateToWeather, onNavigateToCalendar, onNavigat
                     </View>
                 </View>
             </Modal>
+
+            <NotificationsModal 
+                visible={showNotifications} 
+                onClose={() => setShowNotifications(false)} 
+            />
         </SafeAreaView>
     );
 };
@@ -784,15 +790,16 @@ const getStyles = (colors, isDark) => StyleSheet.create({
         fontSize: 14,
         color: '#FFFFFF',
     },
-    refreshButton: {
+    notificationButton: {
         width: 40,
         height: 40,
         borderRadius: 20,
         backgroundColor: 'rgba(255, 255, 255, 0.2)',
         justifyContent: 'center',
         alignItems: 'center',
+        position: 'relative',
     },
-    refreshIcon: {
+    notificationIcon: {
         fontSize: 20,
         color: '#FFFFFF',
     },
