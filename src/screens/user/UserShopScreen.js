@@ -5,6 +5,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../config/supabase';
 import { useFocusEffect } from 'expo-router';
 import ProductDetailModal from '../../components/ProductDetailModal';
+import { cache } from '../../utils/cache';
 
 const { width } = Dimensions.get('window');
 
@@ -23,11 +24,7 @@ const UserShopScreen = () => {
     const productCategories = ['grain', 'vegetable', 'fruit', 'livestock', 'cash crop', 'spice and herb', 'fish'];
 
     useEffect(() => {
-        if (selectedCategory !== 'all') {
-            loadProductsByCategory();
-        } else {
-            setProducts([]);
-        }
+        loadProductsByCategory();
     }, [selectedCategory, organicFilter]);
 
     useEffect(() => {
@@ -40,10 +37,8 @@ const UserShopScreen = () => {
 
     useFocusEffect(
         React.useCallback(() => {
-            if (selectedCategory !== 'all') {
-                loadProductsByCategory();
-            }
-        }, [selectedCategory])
+            loadProductsByCategory();
+        }, [selectedCategory, organicFilter])
     );
 
     const loadProductsByCategory = async () => {
@@ -80,8 +75,12 @@ const UserShopScreen = () => {
                         phone
                     )
                 `)
-                .eq('category', selectedCategory)
                 .eq('status', 'Active');
+            
+            // Filter by category only if not "all"
+            if (selectedCategory !== 'all') {
+                query = query.eq('category', selectedCategory);
+            }
             
             // Add organic filter if enabled
             if (organicFilter) {
@@ -90,7 +89,7 @@ const UserShopScreen = () => {
             
             const { data: productsData, error: productsError } = await query
                 .order('created_at', { ascending: false })
-                .limit(20);
+                .limit(selectedCategory === 'all' ? 50 : 20);
 
             if (productsError) {
                 console.error('Error loading products:', productsError);
@@ -227,9 +226,6 @@ const UserShopScreen = () => {
                             ]}
                             onPress={() => {
                                 setOrganicFilter(!organicFilter);
-                                if (selectedCategory !== 'all') {
-                                    loadProductsByCategory();
-                                }
                             }}
                         >
                             <View style={[
@@ -356,13 +352,64 @@ const UserShopScreen = () => {
                         </View>
                     )}
 
-                    {/* All Products Section - Show empty when "All" is selected and no search */}
+                    {/* All Products Section - Show products when "All" is selected and no search */}
                     {selectedCategory === 'all' && searchQuery.trim().length === 0 && (
-                        <View style={dynamicStyles.emptyContainer}>
-                            <Text style={dynamicStyles.emptyIcon}>🛍️</Text>
-                            <Text style={[dynamicStyles.emptyText, { color: colors.text }]}>
-                                Select a category to view products
-                            </Text>
+                        <View style={dynamicStyles.section}>
+                            <View style={dynamicStyles.sectionHeader}>
+                                <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>
+                                    All Products
+                                </Text>
+                            </View>
+                            {isLoading ? (
+                                <View style={dynamicStyles.loadingContainer}>
+                                    <ActivityIndicator size="large" color={colors.primary} />
+                                </View>
+                            ) : displayProducts.length > 0 ? (
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={dynamicStyles.horizontalScroll}>
+                                    {displayProducts.map((product) => (
+                                        <TouchableOpacity 
+                                            key={product.id} 
+                                            style={[dynamicStyles.productCard, { backgroundColor: colors.surface }]}
+                                            onPress={() => handleProductPress(product)}
+                                        >
+                                            <View style={[dynamicStyles.productImageContainer, { backgroundColor: colors.border }]}>
+                                                {product.image_url ? (
+                                                    <Image 
+                                                        source={{ uri: product.image_url }} 
+                                                        style={dynamicStyles.productImage}
+                                                        resizeMode="cover"
+                                                    />
+                                                ) : (
+                                                    <Text style={dynamicStyles.productEmoji}>🌾</Text>
+                                                )}
+                                            </View>
+                                            <View style={dynamicStyles.productNameRow}>
+                                                <Text style={[dynamicStyles.productName, { color: colors.text }]} numberOfLines={1}>
+                                                    {product.name}
+                                                </Text>
+                                                {product.is_organic && (
+                                                    <View style={[dynamicStyles.organicBadge, { backgroundColor: '#4CAF50' + '20' }]}>
+                                                        <Text style={[dynamicStyles.organicBadgeText, { color: '#4CAF50' }]}>🌿</Text>
+                                                    </View>
+                                                )}
+                                            </View>
+                                            <Text style={[dynamicStyles.productStore, { color: colors.textSecondary }]} numberOfLines={1}>
+                                                {product.user_profiles?.full_name || 'Farmer'}
+                                            </Text>
+                                            <Text style={[dynamicStyles.productPrice, { color: colors.primary }]}>
+                                                NPR {formatPrice(product.price)} / {product.stock_unit || 'kilograms'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            ) : (
+                                <View style={dynamicStyles.emptyContainer}>
+                                    <Text style={dynamicStyles.emptyIcon}>🌾</Text>
+                                    <Text style={[dynamicStyles.emptyText, { color: colors.text }]}>
+                                        No products available
+                                    </Text>
+                                </View>
+                            )}
                         </View>
                     )}
 
@@ -497,6 +544,31 @@ const getStyles = (colors, isDark) => StyleSheet.create({
     categoryFilterText: {
         fontSize: 14,
         fontWeight: '600',
+    },
+    organicFilterContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 12,
+        borderRadius: 12,
+        marginBottom: 20,
+    },
+    organicFilterLabel: {
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    organicToggle: {
+        width: 50,
+        height: 28,
+        borderRadius: 14,
+        borderWidth: 1,
+        padding: 2,
+        justifyContent: 'center',
+    },
+    organicToggleCircle: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
     },
     section: {
         marginBottom: 32,

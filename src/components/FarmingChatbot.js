@@ -13,10 +13,18 @@ import {
     Dimensions,
     Alert
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../context/ThemeContext';
 import { getAIChatResponse } from '../services/geminiService';
 import * as Animatable from 'react-native-animatable';
+
+// Import ImagePicker with error handling for web
+let ImagePicker = null;
+try {
+    ImagePicker = require('expo-image-picker');
+} catch (e) {
+    // ImagePicker not available (e.g., on web)
+    console.warn('expo-image-picker not available:', e);
+}
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -150,6 +158,16 @@ const FarmingChatbot = ({ visible, onClose }) => {
 
     const handleUploadPhoto = async () => {
         try {
+            // Check if ImagePicker is available (not available on web)
+            if (Platform.OS === 'web' || !ImagePicker) {
+                Alert.alert(
+                    'Photo Upload',
+                    'Photo upload feature is available on mobile devices. Please use the mobile app to upload photos.',
+                    [{ text: 'OK' }]
+                );
+                return;
+            }
+
             // Request permission to access media library
             const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
             
@@ -177,6 +195,11 @@ const FarmingChatbot = ({ visible, onClose }) => {
             }
         } catch (error) {
             console.error('Error opening image picker:', error);
+            Alert.alert(
+                'Error',
+                'Failed to open photo picker. Please try again.',
+                [{ text: 'OK' }]
+            );
         }
     };
 
@@ -267,14 +290,21 @@ const FarmingChatbot = ({ visible, onClose }) => {
             animationType="slide"
             transparent={true}
             onRequestClose={onClose}
+            accessibilityViewIsModal={true}
+            accessibilityLabel="Farming Assistant Chatbot"
         >
             <Animated.View 
                 style={[
                     dynamicStyles.modalOverlay,
                     { opacity: fadeAnim }
                 ]}
+                importantForAccessibility="yes"
+                accessibilityRole="dialog"
             >
-                <View style={[dynamicStyles.modalContainer, { backgroundColor: colors.card }]}>
+                <View 
+                    style={[dynamicStyles.modalContainer, { backgroundColor: colors.card }]}
+                    importantForAccessibility="yes"
+                >
                     {/* Header */}
                     <View style={[dynamicStyles.header, { borderBottomColor: colors.border }]}>
                         <View style={dynamicStyles.headerLeft}>
@@ -382,6 +412,9 @@ const FarmingChatbot = ({ visible, onClose }) => {
                                 maxLength={500}
                                 onSubmitEditing={handleSend}
                                 returnKeyType="send"
+                                accessibilityLabel="Chat input"
+                                accessibilityHint="Type your farming question here"
+                                importantForAccessibility="yes"
                             />
                             {Speech && (
                                 <TouchableOpacity
