@@ -110,7 +110,16 @@ const FarmerDashboardScreen = () => {
                 onPress={() => setShowChatbot(true)}
                 activeOpacity={0.8}
             >
-                <Text style={dynamicStyles.chatbotIcon}>🤖</Text>
+                <View style={dynamicStyles.chatbotIconContainer}>
+                    {/* Chat bubble icon with message lines */}
+                    <View style={[dynamicStyles.chatBubble, { backgroundColor: '#FFFFFF' }]}>
+                        <View style={dynamicStyles.chatLines}>
+                            <View style={[dynamicStyles.chatLine, { backgroundColor: colors.primary, width: 12 }]} />
+                            <View style={[dynamicStyles.chatLine, { backgroundColor: colors.primary, width: 16 }]} />
+                            <View style={[dynamicStyles.chatLine, { backgroundColor: colors.primary, width: 8 }]} />
+                        </View>
+                    </View>
+                </View>
             </TouchableOpacity>
 
             {/* Chatbot Modal */}
@@ -224,8 +233,30 @@ const getStyles = (colors, isDark) => StyleSheet.create({
         shadowRadius: 8,
         zIndex: 1000,
     },
-    chatbotIcon: {
-        fontSize: 32,
+    chatbotIconContainer: {
+        width: 32,
+        height: 32,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    chatBubble: {
+        width: 28,
+        height: 22,
+        borderRadius: 6,
+        justifyContent: 'center',
+        alignItems: 'flex-start',
+        paddingHorizontal: 6,
+        paddingVertical: 4,
+        position: 'relative',
+    },
+    chatLines: {
+        flexDirection: 'column',
+        gap: 2.5,
+        alignItems: 'flex-start',
+    },
+    chatLine: {
+        height: 2,
+        borderRadius: 1,
     },
 });
 

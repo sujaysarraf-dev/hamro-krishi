@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Modal, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../config/supabase';
 import SweetAlert from '../../components/SweetAlert';
+import { getUserWithRefresh } from '../../utils/authHelpers';
 
 const DonateCropsScreen = () => {
     const router = useRouter();
@@ -86,6 +87,14 @@ const DonateCropsScreen = () => {
         loadDonations();
     }, []);
 
+    // Refresh donations when screen comes into focus
+    useFocusEffect(
+        React.useCallback(() => {
+            loadTotalDonations();
+            loadDonations();
+        }, [])
+    );
+
     useEffect(() => {
         const backAction = () => {
             router.back();
@@ -98,8 +107,11 @@ const DonateCropsScreen = () => {
 
     const loadTotalDonations = async () => {
         try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
+            const { user, error: authError } = await getUserWithRefresh();
+            if (authError || !user) {
+                console.error('Auth error loading donations count:', authError);
+                return;
+            }
 
             const { data, error } = await supabase
                 .from('crop_donations')
@@ -120,8 +132,12 @@ const DonateCropsScreen = () => {
     const loadDonations = async () => {
         try {
             setLoadingDonations(true);
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
+            const { user, error: authError } = await getUserWithRefresh();
+            if (authError || !user) {
+                console.error('Auth error loading donations:', authError);
+                setDonations([]);
+                return;
+            }
 
             const { data, error } = await supabase
                 .from('crop_donations')
@@ -131,12 +147,14 @@ const DonateCropsScreen = () => {
 
             if (error) {
                 console.error('Error loading donations:', error);
+                setDonations([]);
                 return;
             }
 
             setDonations(data || []);
         } catch (error) {
             console.error('Error loading donations:', error);
+            setDonations([]);
         } finally {
             setLoadingDonations(false);
         }
@@ -203,10 +221,10 @@ const DonateCropsScreen = () => {
 
         try {
             setLoading(true);
-            const { data: { user } } = await supabase.auth.getUser();
+            const { user, error: authError } = await getUserWithRefresh();
             
-            if (!user) {
-                throw new Error('User not authenticated');
+            if (authError || !user) {
+                throw new Error(authError?.message || 'User not authenticated');
             }
 
             // Prepare all donations to insert
@@ -222,14 +240,23 @@ const DonateCropsScreen = () => {
                 status: 'available'
             }));
 
-            const { error } = await supabase
+            console.log('Submitting donations:', donationsToInsert);
+
+            const { data: insertedData, error } = await supabase
                 .from('crop_donations')
-                .insert(donationsToInsert);
+                .insert(donationsToInsert)
+                .select();
 
             if (error) {
                 console.error('Error submitting donations:', error);
                 throw error;
             }
+
+            console.log('Donations submitted successfully:', insertedData);
+
+            // Refresh counts and list immediately
+            await loadTotalDonations();
+            await loadDonations();
 
             setAlert({
                 visible: true,
@@ -252,8 +279,6 @@ const DonateCropsScreen = () => {
                         pickupLocation: ''
                     });
                     setShowDonateModal(false);
-                    loadTotalDonations();
-                    loadDonations();
                 }
             });
         } catch (error) {
@@ -319,6 +344,45 @@ const DonateCropsScreen = () => {
             title: 'Donation Confirmed!',
             message: `You have committed to donate ${request.quantity} ${request.unit} of ${request.productName} to ${request.organizationName}. Please contact them at ${request.contactNumber} to arrange pickup.`,
         });
+    };
+
+    const handleUpdateDonationStatus = async (donationId, newStatus) => {
+        try {
+            const { user, error: authError } = await getUserWithRefresh();
+            if (authError || !user) {
+                throw new Error(authError?.message || 'User not authenticated');
+            }
+
+            const { error } = await supabase
+                .from('crop_donations')
+                .update({ status: newStatus })
+                .eq('id', donationId)
+                .eq('farmer_id', user.id);
+
+            if (error) {
+                console.error('Error updating donation status:', error);
+                throw error;
+            }
+
+            // Refresh the donations list and count
+            await loadTotalDonations();
+            await loadDonations();
+
+            setAlert({
+                visible: true,
+                type: 'success',
+                title: 'Status Updated',
+                message: `Donation status updated to ${newStatus}.`,
+            });
+        } catch (error) {
+            console.error('Error updating donation status:', error);
+            setAlert({
+                visible: true,
+                type: 'error',
+                title: 'Error',
+                message: error.message || 'Failed to update donation status. Please try again.',
+            });
+        }
     };
 
     const dynamicStyles = getStyles(colors, isDark);
@@ -481,6 +545,24 @@ const DonateCropsScreen = () => {
                                     <Text style={[dynamicStyles.donationDate, { color: colors.textSecondary }]}>
                                         Listed: {formatDate(donation.created_at)}
                                     </Text>
+                                    
+                                    {/* Action Buttons */}
+                                    {donation.status === 'available' && (
+                                        <View style={[dynamicStyles.donationActions, { borderTopColor: colors.border }]}>
+                                            <TouchableOpacity
+                                                style={[dynamicStyles.actionButton, { backgroundColor: '#4CAF50' }]}
+                                                onPress={() => handleUpdateDonationStatus(donation.id, 'donated')}
+                                            >
+                                                <Text style={dynamicStyles.actionButtonText}>Mark as Donated</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={[dynamicStyles.actionButton, { backgroundColor: '#9E9E9E' }]}
+                                                onPress={() => handleUpdateDonationStatus(donation.id, 'cancelled')}
+                                            >
+                                                <Text style={dynamicStyles.actionButtonText}>Cancel</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
                                 </View>
                             ))}
                         </View>
@@ -1135,6 +1217,26 @@ const getStyles = (colors, isDark) => StyleSheet.create({
     donateToRequestButtonText: {
         color: '#FFFFFF',
         fontSize: 15,
+        fontWeight: '600',
+    },
+    donationActions: {
+        flexDirection: 'row',
+        gap: 8,
+        marginTop: 12,
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: colors.border,
+    },
+    actionButton: {
+        flex: 1,
+        paddingVertical: 10,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    actionButtonText: {
+        color: '#FFFFFF',
+        fontSize: 13,
         fontWeight: '600',
     },
 });

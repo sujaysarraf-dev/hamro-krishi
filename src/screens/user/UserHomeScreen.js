@@ -23,11 +23,7 @@ const UserHomeScreen = () => {
     const productCategories = ['grain', 'vegetable', 'fruit', 'livestock', 'cash crop', 'spice and herb', 'fish'];
 
     useEffect(() => {
-        if (selectedCategory !== 'all') {
-            loadProductsByCategory();
-        } else {
-            setProducts([]);
-        }
+        loadProductsByCategory();
     }, [selectedCategory]);
 
     useEffect(() => {
@@ -40,9 +36,7 @@ const UserHomeScreen = () => {
 
     useFocusEffect(
         React.useCallback(() => {
-            if (selectedCategory !== 'all') {
-                loadProductsByCategory();
-            }
+            loadProductsByCategory();
         }, [selectedCategory])
     );
 
@@ -59,8 +53,8 @@ const UserHomeScreen = () => {
                 return;
             }
             
-            // Optimized query with join - fetch products and profiles in one query
-            const { data: productsData, error: productsError } = await supabase
+            // Build query based on category
+            let query = supabase
                 .from('products')
                 .select(`
                     id,
@@ -80,10 +74,17 @@ const UserHomeScreen = () => {
                         phone
                     )
                 `)
-                .eq('category', selectedCategory)
                 .eq('status', 'Active')
-                .order('created_at', { ascending: false })
-                .limit(20);
+                .order('created_at', { ascending: false });
+            
+            // If "all" is selected, fetch 4 products. Otherwise, filter by category and fetch 20
+            if (selectedCategory === 'all') {
+                query = query.limit(4);
+            } else {
+                query = query.eq('category', selectedCategory).limit(20);
+            }
+            
+            const { data: productsData, error: productsError } = await query;
 
             if (productsError) {
                 console.error('Error loading products:', productsError);
@@ -169,61 +170,6 @@ const UserHomeScreen = () => {
         setSelectedProduct(null);
     };
 
-    const [featuredProducts, setFeaturedProducts] = useState([]);
-    const [loadingFeatured, setLoadingFeatured] = useState(false);
-
-    useEffect(() => {
-        loadFeaturedProducts();
-    }, []);
-
-    useFocusEffect(
-        React.useCallback(() => {
-            loadFeaturedProducts();
-        }, [])
-    );
-
-    const loadFeaturedProducts = async () => {
-        try {
-            setLoadingFeatured(true);
-            
-            // Optimized query with join for featured products
-            const { data: productsData, error: productsError } = await supabase
-                .from('products')
-                .select(`
-                    id,
-                    name,
-                    description,
-                    price,
-                    stock_quantity,
-                    stock_unit,
-                    category,
-                    image_url,
-                    is_organic,
-                    created_at,
-                    farmer_id,
-                    user_profiles:farmer_id (
-                        id,
-                        full_name,
-                        phone
-                    )
-                `)
-                .eq('status', 'Active')
-                .order('created_at', { ascending: false })
-                .limit(3);
-
-            if (productsError) {
-                console.error('Error loading featured products:', productsError);
-                throw productsError;
-            }
-
-            setFeaturedProducts(productsData || []);
-
-        } catch (error) {
-            console.error('Error loading featured products:', error);
-        } finally {
-            setLoadingFeatured(false);
-        }
-    };
 
     const dynamicStyles = getStyles(colors, isDark);
 
@@ -312,7 +258,7 @@ const UserHomeScreen = () => {
                                     <ActivityIndicator size="large" color={colors.primary} />
                                 </View>
                             ) : displayProducts.length > 0 ? (
-                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={dynamicStyles.horizontalScroll}>
+                                <View style={dynamicStyles.productsGrid}>
                                     {displayProducts.map((product) => (
                                         <TouchableOpacity 
                                             key={product.id} 
@@ -329,6 +275,11 @@ const UserHomeScreen = () => {
                                                 ) : (
                                                     <Text style={dynamicStyles.productEmoji}>🌾</Text>
                                                 )}
+                                                {product.is_organic && (
+                                                    <View style={dynamicStyles.organicBadge}>
+                                                        <Text style={dynamicStyles.organicBadgeText}>🌿 Organic</Text>
+                                                    </View>
+                                                )}
                                             </View>
                                             <Text style={[dynamicStyles.productName, { color: colors.text }]} numberOfLines={1}>
                                                 {product.name}
@@ -341,7 +292,7 @@ const UserHomeScreen = () => {
                                             </Text>
                                         </TouchableOpacity>
                                     ))}
-                                </ScrollView>
+                                </View>
                             ) : (
                                 <View style={dynamicStyles.emptyContainer}>
                                     <Text style={dynamicStyles.emptyIcon}>🔍</Text>
@@ -356,19 +307,19 @@ const UserHomeScreen = () => {
                         </View>
                     )}
 
-                    {/* All Products Section - Show featured products from DB when "All" is selected and no search */}
+                    {/* All Products Section - Show products from DB when "All" is selected and no search */}
                     {selectedCategory === 'all' && searchQuery.trim().length === 0 && (
                         <View style={dynamicStyles.section}>
                             <View style={dynamicStyles.sectionHeader}>
                                 <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>Products</Text>
                             </View>
-                            {loadingFeatured ? (
+                            {isLoading ? (
                                 <View style={dynamicStyles.loadingContainer}>
                                     <ActivityIndicator size="large" color={colors.primary} />
                                 </View>
-                            ) : featuredProducts.length > 0 ? (
-                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={dynamicStyles.horizontalScroll}>
-                                    {featuredProducts.map((product) => (
+                            ) : displayProducts.length > 0 ? (
+                                <View style={dynamicStyles.productsGrid}>
+                                    {displayProducts.map((product) => (
                                         <TouchableOpacity 
                                             key={product.id} 
                                             style={[dynamicStyles.productCard, { backgroundColor: colors.surface }]}
@@ -384,6 +335,11 @@ const UserHomeScreen = () => {
                                                 ) : (
                                                     <Text style={dynamicStyles.productEmoji}>🌾</Text>
                                                 )}
+                                                {product.is_organic && (
+                                                    <View style={dynamicStyles.organicBadge}>
+                                                        <Text style={dynamicStyles.organicBadgeText}>🌿 Organic</Text>
+                                                    </View>
+                                                )}
                                             </View>
                                             <Text style={[dynamicStyles.productName, { color: colors.text }]} numberOfLines={1}>
                                                 {product.name}
@@ -396,7 +352,7 @@ const UserHomeScreen = () => {
                                             </Text>
                                         </TouchableOpacity>
                                     ))}
-                                </ScrollView>
+                                </View>
                             ) : (
                                 <View style={dynamicStyles.emptyContainer}>
                                     <Text style={dynamicStyles.emptyIcon}>🌾</Text>
@@ -421,7 +377,7 @@ const UserHomeScreen = () => {
                                     <ActivityIndicator size="large" color={colors.primary} />
                                 </View>
                             ) : displayProducts.length > 0 ? (
-                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={dynamicStyles.horizontalScroll}>
+                                <View style={dynamicStyles.productsGrid}>
                                     {displayProducts.map((product) => (
                                         <TouchableOpacity 
                                             key={product.id} 
@@ -437,6 +393,11 @@ const UserHomeScreen = () => {
                                                     />
                                                 ) : (
                                                     <Text style={dynamicStyles.productEmoji}>🌾</Text>
+                                                )}
+                                                {product.is_organic && (
+                                                    <View style={dynamicStyles.organicBadge}>
+                                                        <Text style={dynamicStyles.organicBadgeText}>🌿 Organic</Text>
+                                                    </View>
                                                 )}
                                             </View>
                                             <Text style={[dynamicStyles.productName, { color: colors.text }]} numberOfLines={1}>
@@ -455,7 +416,7 @@ const UserHomeScreen = () => {
                                             )}
                                         </TouchableOpacity>
                                     ))}
-                                </ScrollView>
+                                </View>
                             ) : (
                                 <View style={dynamicStyles.emptyContainer}>
                                     <Text style={dynamicStyles.emptyIcon}>🌾</Text>
@@ -581,13 +542,16 @@ const getStyles = (colors, isDark) => StyleSheet.create({
         color: colors.text,
         textAlign: 'center',
     },
-    horizontalScroll: {
-        marginHorizontal: -20,
-        paddingHorizontal: 20,
+    productsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        marginHorizontal: -8,
     },
     productCard: {
-        width: 180,
-        marginRight: 16,
+        width: '48%',
+        marginBottom: 16,
+        marginHorizontal: '1%',
         backgroundColor: colors.surface,
         borderRadius: 12,
         padding: 12,
@@ -600,6 +564,24 @@ const getStyles = (colors, isDark) => StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 12,
+        position: 'relative',
+        overflow: 'hidden',
+    },
+    organicBadge: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
+        backgroundColor: '#4CAF50',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#FFFFFF',
+    },
+    organicBadgeText: {
+        color: '#FFFFFF',
+        fontSize: 10,
+        fontWeight: '700',
     },
     productEmoji: {
         fontSize: 60,

@@ -68,14 +68,6 @@ const RoleSelectionScreen = () => {
                 >
                     <Text style={styles.continueButtonText}>Continue</Text>
                 </TouchableOpacity>
-
-                {/* Pagination Indicator */}
-                <View style={styles.paginationContainer}>
-                    <View style={[styles.paginationDot, styles.activeDot]} />
-                    <View style={styles.paginationDot} />
-                    <View style={styles.paginationDot} />
-                    <View style={styles.paginationDot} />
-                </View>
             </View>
         </SafeAreaView>
     );
@@ -164,23 +156,6 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 18,
         fontWeight: '600',
-    },
-    paginationContainer: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 20,
-        width: '100%',
-    },
-    paginationDot: {
-        height: 4,
-        width: 40,
-        backgroundColor: '#E0E0E0',
-        marginHorizontal: 4,
-        borderRadius: 2,
-    },
-    activeDot: {
-        backgroundColor: '#228B22',
     },
 });
 

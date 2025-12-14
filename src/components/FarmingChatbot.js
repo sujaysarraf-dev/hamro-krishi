@@ -169,9 +169,9 @@ const FarmingChatbot = ({ visible, onClose }) => {
             const numberedMatch = trimmedLine.match(/^(\d+)\.\s+(.+)$/);
             if (numberedMatch) {
                 elements.push(
-                    <Text key={lineIndex} style={[dynamicStyles.messageText, { marginBottom: 4 }]}>
-                        <Text style={dynamicStyles.boldText}>{numberedMatch[1]}. </Text>
-                        {formatInlineText(numberedMatch[2])}
+                    <Text key={lineIndex} style={[dynamicStyles.messageText, { marginBottom: 4, color: colors.text }]}>
+                        <Text style={[dynamicStyles.boldText, { color: colors.text }]}>{numberedMatch[1]}. </Text>
+                        <Text style={{ color: colors.text }}>{formatInlineText(numberedMatch[2])}</Text>
                     </Text>
                 );
                 return;
@@ -181,9 +181,9 @@ const FarmingChatbot = ({ visible, onClose }) => {
             if (trimmedLine.match(/^[-*•]\s+/)) {
                 const content = trimmedLine.replace(/^[-*•]\s+/, '');
                 elements.push(
-                    <Text key={lineIndex} style={[dynamicStyles.messageText, { marginBottom: 4 }]}>
-                        <Text>• </Text>
-                        {formatInlineText(content)}
+                    <Text key={lineIndex} style={[dynamicStyles.messageText, { marginBottom: 4, color: colors.text }]}>
+                        <Text style={{ color: colors.text }}>• </Text>
+                        <Text style={{ color: colors.text }}>{formatInlineText(content)}</Text>
                     </Text>
                 );
                 return;
@@ -191,8 +191,8 @@ const FarmingChatbot = ({ visible, onClose }) => {
             
             // Regular text with inline formatting
             elements.push(
-                <Text key={lineIndex} style={[dynamicStyles.messageText, { marginBottom: 4 }]}>
-                    {formatInlineText(trimmedLine)}
+                <Text key={lineIndex} style={[dynamicStyles.messageText, { marginBottom: 4, color: colors.text }]}>
+                    <Text style={{ color: colors.text }}>{formatInlineText(trimmedLine)}</Text>
                 </Text>
             );
         });
@@ -245,7 +245,15 @@ const FarmingChatbot = ({ visible, onClose }) => {
                     <View style={[dynamicStyles.header, { borderBottomColor: colors.border }]}>
                         <View style={dynamicStyles.headerLeft}>
                             <View style={[dynamicStyles.botAvatar, { backgroundColor: colors.primary + '20' }]}>
-                                <Text style={dynamicStyles.botIcon}>🤖</Text>
+                                <View style={dynamicStyles.botIconContainer}>
+                                    <View style={[dynamicStyles.chatBubbleHeader, { backgroundColor: colors.primary + '20' }]}>
+                                        <View style={dynamicStyles.chatLinesHeader}>
+                                            <View style={[dynamicStyles.chatLineHeader, { backgroundColor: colors.primary, width: 10 }]} />
+                                            <View style={[dynamicStyles.chatLineHeader, { backgroundColor: colors.primary, width: 14 }]} />
+                                            <View style={[dynamicStyles.chatLineHeader, { backgroundColor: colors.primary, width: 7 }]} />
+                                        </View>
+                                    </View>
+                                </View>
                             </View>
                             <View>
                                 <Text style={[dynamicStyles.headerTitle, { color: colors.text }]}>
@@ -288,7 +296,9 @@ const FarmingChatbot = ({ visible, onClose }) => {
                                 >
                                     <View>
                                         {message.isBot ? (
-                                            renderFormattedText(message.text)
+                                            <View style={{ color: colors.text }}>
+                                                {renderFormattedText(message.text)}
+                                            </View>
                                         ) : (
                                             <Text
                                                 style={[
@@ -414,8 +424,29 @@ const getStyles = (colors, isDark) => StyleSheet.create({
         alignItems: 'center',
         marginRight: 12,
     },
-    botIcon: {
-        fontSize: 28,
+    botIconContainer: {
+        width: 32,
+        height: 32,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    chatBubbleHeader: {
+        width: 24,
+        height: 20,
+        borderRadius: 5,
+        justifyContent: 'center',
+        alignItems: 'flex-start',
+        paddingHorizontal: 5,
+        paddingVertical: 3,
+    },
+    chatLinesHeader: {
+        flexDirection: 'column',
+        gap: 2,
+        alignItems: 'flex-start',
+    },
+    chatLineHeader: {
+        height: 1.5,
+        borderRadius: 0.75,
     },
     headerTitle: {
         fontSize: 18,
