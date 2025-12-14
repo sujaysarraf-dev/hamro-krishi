@@ -3,11 +3,13 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 're
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
+import { useLanguage } from '../../context/LanguageContext';
 import SweetAlert from '../../components/SweetAlert';
 
 const SettingsScreen = () => {
     const router = useRouter();
     const { theme, isDark, colors, setTheme } = useTheme();
+    const { language, setLanguage, t } = useLanguage();
     const [notifications, setNotifications] = useState(true);
     const [emailUpdates, setEmailUpdates] = useState(false);
     const [alert, setAlert] = useState({ visible: false, type: 'info', title: '', message: '' });
@@ -16,12 +18,18 @@ const SettingsScreen = () => {
         setTheme(newTheme);
     };
 
+    const handleLanguageChange = (newLanguage) => {
+        setLanguage(newLanguage);
+    };
+
     const handleAbout = () => {
         setAlert({
             visible: true,
             type: 'info',
-            title: 'About',
-            message: 'Smart Farm App v1.0.0\n\nYour trusted platform for smart farming and agriculture.'
+            title: t('about'),
+            message: language === 'ne' 
+                ? 'स्मार्ट फार्म एप v1.0.0\n\nस्मार्ट खेती र कृषिको लागि तपाईंको विश्वसनीय प्लेटफर्म।'
+                : 'Smart Farm App v1.0.0\n\nYour trusted platform for smart farming and agriculture.'
         });
     };
 
@@ -29,8 +37,10 @@ const SettingsScreen = () => {
         setAlert({
             visible: true,
             type: 'info',
-            title: 'Privacy Policy',
-            message: 'Privacy policy details will be available soon.'
+            title: t('privacyPolicy'),
+            message: language === 'ne'
+                ? 'गोपनीयता नीति विवरण चाँडै उपलब्ध हुनेछ।'
+                : 'Privacy policy details will be available soon.'
         });
     };
 
@@ -38,8 +48,10 @@ const SettingsScreen = () => {
         setAlert({
             visible: true,
             type: 'info',
-            title: 'Terms of Service',
-            message: 'Terms of service details will be available soon.'
+            title: t('termsOfService'),
+            message: language === 'ne'
+                ? 'सेवा सर्तहरूको विवरण चाँडै उपलब्ध हुनेछ।'
+                : 'Terms of service details will be available soon.'
         });
     };
 
@@ -49,21 +61,54 @@ const SettingsScreen = () => {
         <SafeAreaView style={[dynamicStyles.container, { backgroundColor: colors.background }]}>
             <View style={[dynamicStyles.header, { borderBottomColor: colors.border }]}>
                 <TouchableOpacity onPress={() => router.back()} style={dynamicStyles.backButton}>
-                    <Text style={[dynamicStyles.backButtonText, { color: colors.primary }]}>← Back</Text>
+                    <Text style={[dynamicStyles.backButtonText, { color: colors.primary }]}>← {t('back')}</Text>
                 </TouchableOpacity>
-                <Text style={[dynamicStyles.headerTitle, { color: colors.text }]}>Settings</Text>
+                <Text style={[dynamicStyles.headerTitle, { color: colors.text }]}>{t('settings')}</Text>
                 <View style={dynamicStyles.placeholder} />
             </View>
             <ScrollView showsVerticalScrollIndicator={false} style={dynamicStyles.scrollView}>
                 <View style={dynamicStyles.content}>
                     <View style={dynamicStyles.section}>
-                        <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>Appearance</Text>
+                        <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>{t('language')}</Text>
                         
                         <View style={[dynamicStyles.settingItem, { borderBottomColor: colors.border }]}>
                             <View style={dynamicStyles.settingInfo}>
-                                <Text style={[dynamicStyles.settingLabel, { color: colors.text }]}>Theme</Text>
+                                <Text style={[dynamicStyles.settingLabel, { color: colors.text }]}>{t('language')}</Text>
                                 <Text style={[dynamicStyles.settingDescription, { color: colors.textSecondary }]}>
-                                    {theme === 'system' ? 'System default' : theme === 'dark' ? 'Dark mode' : 'Light mode'}
+                                    {language === 'en' ? t('english') : t('nepali')}
+                                </Text>
+                            </View>
+                        </View>
+
+                        <TouchableOpacity 
+                            style={[dynamicStyles.themeOption, { borderBottomColor: colors.border }]}
+                            onPress={() => handleLanguageChange('en')}
+                        >
+                            <View style={dynamicStyles.themeOptionContent}>
+                                <Text style={[dynamicStyles.themeOptionText, { color: colors.text }]}>🇬🇧 {t('english')}</Text>
+                                {language === 'en' && <Text style={[dynamicStyles.checkmark, { color: colors.primary }]}>✓</Text>}
+                            </View>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            style={[dynamicStyles.themeOption, { borderBottomColor: colors.border }]}
+                            onPress={() => handleLanguageChange('ne')}
+                        >
+                            <View style={dynamicStyles.themeOptionContent}>
+                                <Text style={[dynamicStyles.themeOptionText, { color: colors.text }]}>🇳🇵 {t('nepali')}</Text>
+                                {language === 'ne' && <Text style={[dynamicStyles.checkmark, { color: colors.primary }]}>✓</Text>}
+                            </View>
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={dynamicStyles.section}>
+                        <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>{t('appearance')}</Text>
+                        
+                        <View style={[dynamicStyles.settingItem, { borderBottomColor: colors.border }]}>
+                            <View style={dynamicStyles.settingInfo}>
+                                <Text style={[dynamicStyles.settingLabel, { color: colors.text }]}>{t('theme')}</Text>
+                                <Text style={[dynamicStyles.settingDescription, { color: colors.textSecondary }]}>
+                                    {theme === 'system' ? t('systemDefault') : theme === 'dark' ? t('darkMode') : t('lightMode')}
                                 </Text>
                             </View>
                         </View>
@@ -73,7 +118,7 @@ const SettingsScreen = () => {
                             onPress={() => handleThemeChange('light')}
                         >
                             <View style={dynamicStyles.themeOptionContent}>
-                                <Text style={[dynamicStyles.themeOptionText, { color: colors.text }]}>☀️ Light</Text>
+                                <Text style={[dynamicStyles.themeOptionText, { color: colors.text }]}>☀️ {t('lightMode')}</Text>
                                 {theme === 'light' && <Text style={[dynamicStyles.checkmark, { color: colors.primary }]}>✓</Text>}
                             </View>
                         </TouchableOpacity>
@@ -83,7 +128,7 @@ const SettingsScreen = () => {
                             onPress={() => handleThemeChange('dark')}
                         >
                             <View style={dynamicStyles.themeOptionContent}>
-                                <Text style={[dynamicStyles.themeOptionText, { color: colors.text }]}>🌙 Dark</Text>
+                                <Text style={[dynamicStyles.themeOptionText, { color: colors.text }]}>🌙 {t('darkMode')}</Text>
                                 {theme === 'dark' && <Text style={[dynamicStyles.checkmark, { color: colors.primary }]}>✓</Text>}
                             </View>
                         </TouchableOpacity>
@@ -93,19 +138,19 @@ const SettingsScreen = () => {
                             onPress={() => handleThemeChange('system')}
                         >
                             <View style={dynamicStyles.themeOptionContent}>
-                                <Text style={[dynamicStyles.themeOptionText, { color: colors.text }]}>⚙️ System</Text>
+                                <Text style={[dynamicStyles.themeOptionText, { color: colors.text }]}>⚙️ {t('systemDefault')}</Text>
                                 {theme === 'system' && <Text style={[dynamicStyles.checkmark, { color: colors.primary }]}>✓</Text>}
                             </View>
                         </TouchableOpacity>
                     </View>
 
                     <View style={dynamicStyles.section}>
-                        <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>Notifications</Text>
+                        <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>{t('notifications')}</Text>
                         
                         <View style={[dynamicStyles.settingItem, { borderBottomColor: colors.border }]}>
                             <View style={dynamicStyles.settingInfo}>
-                                <Text style={[dynamicStyles.settingLabel, { color: colors.text }]}>Push Notifications</Text>
-                                <Text style={[dynamicStyles.settingDescription, { color: colors.textSecondary }]}>Receive push notifications</Text>
+                                <Text style={[dynamicStyles.settingLabel, { color: colors.text }]}>{t('pushNotifications')}</Text>
+                                <Text style={[dynamicStyles.settingDescription, { color: colors.textSecondary }]}>{t('receivePushNotifications')}</Text>
                             </View>
                             <Switch
                                 value={notifications}
@@ -117,8 +162,8 @@ const SettingsScreen = () => {
 
                         <View style={[dynamicStyles.settingItem, { borderBottomColor: colors.border }]}>
                             <View style={dynamicStyles.settingInfo}>
-                                <Text style={[dynamicStyles.settingLabel, { color: colors.text }]}>Email Updates</Text>
-                                <Text style={[dynamicStyles.settingDescription, { color: colors.textSecondary }]}>Receive email updates</Text>
+                                <Text style={[dynamicStyles.settingLabel, { color: colors.text }]}>{t('emailUpdates')}</Text>
+                                <Text style={[dynamicStyles.settingDescription, { color: colors.textSecondary }]}>{t('receiveEmailUpdates')}</Text>
                             </View>
                             <Switch
                                 value={emailUpdates}
@@ -130,23 +175,23 @@ const SettingsScreen = () => {
                     </View>
 
                     <View style={dynamicStyles.section}>
-                        <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>About</Text>
+                        <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>{t('about')}</Text>
                         
                         <TouchableOpacity style={[dynamicStyles.menuItem, { borderBottomColor: colors.border }]} onPress={handleAbout}>
                             <Text style={dynamicStyles.menuIcon}>ℹ️</Text>
-                            <Text style={[dynamicStyles.menuText, { color: colors.text }]}>About</Text>
+                            <Text style={[dynamicStyles.menuText, { color: colors.text }]}>{t('about')}</Text>
                             <Text style={[dynamicStyles.menuArrow, { color: colors.textSecondary }]}>›</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity style={[dynamicStyles.menuItem, { borderBottomColor: colors.border }]} onPress={handlePrivacy}>
                             <Text style={dynamicStyles.menuIcon}>🔒</Text>
-                            <Text style={[dynamicStyles.menuText, { color: colors.text }]}>Privacy Policy</Text>
+                            <Text style={[dynamicStyles.menuText, { color: colors.text }]}>{t('privacyPolicy')}</Text>
                             <Text style={[dynamicStyles.menuArrow, { color: colors.textSecondary }]}>›</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity style={[dynamicStyles.menuItem, { borderBottomColor: colors.border }]} onPress={handleTerms}>
                             <Text style={dynamicStyles.menuIcon}>📄</Text>
-                            <Text style={[dynamicStyles.menuText, { color: colors.text }]}>Terms of Service</Text>
+                            <Text style={[dynamicStyles.menuText, { color: colors.text }]}>{t('termsOfService')}</Text>
                             <Text style={[dynamicStyles.menuArrow, { color: colors.textSecondary }]}>›</Text>
                         </TouchableOpacity>
                     </View>
