@@ -40,7 +40,21 @@ export default function Index() {
             setRedirectTo(null);
             
             // Check Supabase session directly (no AsyncStorage dependency)
-            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            let { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            
+            // If we get a 403 or auth error, try refreshing the session
+            if (sessionError && (sessionError.status === 403 || sessionError.message?.includes('JWT'))) {
+                console.log('Session error detected, attempting to refresh...');
+                const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+                
+                if (!refreshError && refreshedSession) {
+                    session = refreshedSession;
+                    sessionError = null;
+                    console.log('Session refreshed successfully');
+                } else {
+                    console.error('Failed to refresh session:', refreshError);
+                }
+            }
             
             console.log('Session check:', { hasSession: !!session, userId: session?.user?.id, error: sessionError });
             

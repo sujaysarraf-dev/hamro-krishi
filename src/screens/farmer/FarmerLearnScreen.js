@@ -25,6 +25,103 @@ if (Platform.OS !== 'web') {
     }
 }
 
+// Web Video Component using HTML5 video for React Native Web
+const WebVideoPlayer = ({ source, style, onLoad, onError }) => {
+    const containerRef = React.useRef(null);
+    const videoId = React.useRef(`video-${Math.random().toString(36).substr(2, 9)}`).current;
+
+    // Convert require() source to URL for web
+    const getVideoSource = () => {
+        if (!source) return '';
+        // On web, require() for video assets returns a URL string
+        // On native, it returns a number (asset ID)
+        if (typeof source === 'number') {
+            // For web, try to resolve the asset ID to a URL
+            // In React Native Web, the bundler should handle this
+            // If it's still a number, we might need to use Asset.fromModule
+            // For now, try to use it directly - the bundler should convert it
+            return source;
+        }
+        if (typeof source === 'string') {
+            // Direct URL string
+            return source;
+        }
+        if (source && typeof source === 'object') {
+            // Object with uri property
+            return source.uri || '';
+        }
+        return '';
+    };
+
+    const videoSource = getVideoSource();
+
+    React.useEffect(() => {
+        if (Platform.OS !== 'web' || !containerRef.current || !videoSource) return;
+
+        // Resolve video source URL
+        let resolvedSource = videoSource;
+        
+        // If source is a number (asset ID), try to resolve it
+        // On React Native Web, require() should return a URL string, but handle both cases
+        if (typeof videoSource === 'number') {
+            // Try to get the asset URL from the asset registry
+            // In React Native Web, this might be in __webpack_require__ or similar
+            // For now, log and try to use it as-is (bundler should handle it)
+            console.warn('Video source is a number on web, may need asset resolution:', videoSource);
+        }
+
+        // Create video element
+        const video = document.createElement('video');
+        video.id = videoId;
+        video.src = resolvedSource;
+        video.controls = true;
+        video.playsInline = true;
+        video.preload = 'metadata';
+        video.style.width = '100%';
+        video.style.height = '100%';
+        video.style.objectFit = 'contain';
+        video.style.backgroundColor = '#000';
+        video.style.borderRadius = '12px';
+
+        const handleLoadedData = () => {
+            if (onLoad) onLoad();
+        };
+
+        const handleError = (e) => {
+            console.error('Video error:', e, 'Source:', resolvedSource);
+            if (onError) onError(e);
+        };
+
+        video.addEventListener('loadeddata', handleLoadedData);
+        video.addEventListener('error', handleError);
+
+        // Clear container and append video
+        containerRef.current.innerHTML = '';
+        containerRef.current.appendChild(video);
+
+        return () => {
+            video.removeEventListener('loadeddata', handleLoadedData);
+            video.removeEventListener('error', handleError);
+            if (containerRef.current && video.parentNode === containerRef.current) {
+                containerRef.current.removeChild(video);
+            }
+        };
+    }, [videoId, videoSource, onLoad, onError]);
+
+    if (Platform.OS === 'web') {
+        return (
+            <View style={[{ position: 'relative', width: '100%', aspectRatio: 16 / 9, backgroundColor: '#000', borderRadius: 12, overflow: 'hidden' }, style]}>
+                <View
+                    ref={containerRef}
+                    style={{ width: '100%', height: '100%' }}
+                />
+            </View>
+        );
+    }
+
+    return null;
+};
+
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const FarmerLearnScreen = ({ onNavigateBack }) => {
@@ -757,12 +854,30 @@ const FarmerLearnScreen = ({ onNavigateBack }) => {
                                                     <Text style={dynamicStyles.retryButtonText}>Retry</Text>
                                                 </TouchableOpacity>
                                             </View>
-                                        ) : Platform.OS === 'web' ? (
-                                            <View style={dynamicStyles.videoErrorContainer}>
-                                                <Text style={dynamicStyles.videoErrorIcon}>📹</Text>
-                                                <Text style={[dynamicStyles.videoErrorText, { color: colors.textSecondary }]}>
-                                                    Video playback is not available on web. Please use the mobile app to view videos.
-                                                </Text>
+                                        ) : Platform.OS === 'web' && videoSource ? (
+                                            <View style={dynamicStyles.videoWrapper}>
+                                                <WebVideoPlayer
+                                                    source={videoSource}
+                                                    style={dynamicStyles.video}
+                                                    onLoad={() => {
+                                                        setVideoLoading(false);
+                                                        setVideoError(false);
+                                                    }}
+                                                    onError={() => {
+                                                        setVideoLoading(false);
+                                                        setVideoError(true);
+                                                    }}
+                                                    onPlay={() => setIsPlaying(true)}
+                                                    onPause={() => setIsPlaying(false)}
+                                                />
+                                                {videoLoading && (
+                                                    <View style={dynamicStyles.videoLoadingOverlay}>
+                                                        <ActivityIndicator size="large" color="#FFFFFF" />
+                                                        <Text style={dynamicStyles.videoLoadingTextOverlay}>
+                                                            Loading video...
+                                                        </Text>
+                                                    </View>
+                                                )}
                                             </View>
                                         ) : videoPlayer && videoSource && VideoView ? (
                                             <View style={dynamicStyles.videoWrapper}>

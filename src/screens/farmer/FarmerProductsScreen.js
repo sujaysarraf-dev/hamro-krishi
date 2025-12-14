@@ -3,14 +3,16 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Dimens
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../config/supabase';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import SweetAlert from '../../components/SweetAlert';
+import { getUserWithRefresh } from '../../utils/authHelpers';
 
 const { width, height } = Dimensions.get('window');
 
 const FarmerProductsScreen = () => {
+    const router = useRouter();
     const { colors, isDark } = useTheme();
     const dynamicStyles = getStyles(colors, isDark);
     const [searchQuery, setSearchQuery] = useState('');
@@ -58,9 +60,20 @@ const FarmerProductsScreen = () => {
     const loadProducts = async () => {
         try {
             setLoading(true);
-            const { data: { user } } = await supabase.auth.getUser();
+            // Use helper function that handles token refresh automatically
+            const { user, error: authError } = await getUserWithRefresh();
             
-            if (!user) {
+            if (authError || !user) {
+                // Check if it's a "session missing" error (user not logged in)
+                if (authError?.message?.includes('No active session') || authError?.status === 401) {
+                    console.log('No active session, user needs to log in');
+                    // Don't show error, just return empty - user will be redirected by auth state listener
+                    setProducts([]);
+                    setLoading(false);
+                    return;
+                }
+                console.error('Authentication error loading products:', authError);
+                setProducts([]);
                 setLoading(false);
                 return;
             }
@@ -190,8 +203,11 @@ const FarmerProductsScreen = () => {
     const uploadImage = async (imageUri, productId) => {
         try {
             setUploading(true);
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error('User not authenticated');
+            // Use helper function that handles token refresh automatically
+            const { user, error: authError } = await getUserWithRefresh();
+            if (authError || !user) {
+                throw new Error(authError?.message || 'User not authenticated');
+            }
 
             console.log('Starting image upload for product:', productId);
             console.log('Image URI:', imageUri);
@@ -268,6 +284,13 @@ const FarmerProductsScreen = () => {
                 .getPublicUrl(filePath);
 
             console.log('Upload successful, URL:', publicUrl);
+            console.log('Upload data:', data);
+            
+            // Verify the upload was successful
+            if (!publicUrl) {
+                throw new Error('Failed to get public URL for uploaded image');
+            }
+            
             return publicUrl;
         } catch (error) {
             console.error('Error uploading image:', error);
@@ -313,10 +336,24 @@ const FarmerProductsScreen = () => {
 
         try {
             setSaving(true);
-            const { data: { user } } = await supabase.auth.getUser();
+            // Use helper function that handles token refresh automatically
+            const { user, error: authError } = await getUserWithRefresh();
             
-            if (!user) {
-                throw new Error('User not authenticated');
+            if (authError || !user) {
+                console.error('Authentication error:', authError);
+                setAlert({
+                    visible: true,
+                    type: 'error',
+                    title: 'Authentication Error',
+                    message: 'Your session has expired. Please log in again.',
+                    onConfirm: () => {
+                        setAlert({ ...alert, visible: false });
+                        // Redirect to login
+                        router.replace('/farmer-login');
+                    }
+                });
+                setSaving(false);
+                return;
             }
 
             const productData = {
@@ -337,20 +374,46 @@ const FarmerProductsScreen = () => {
             if (editingProduct) {
                 // Upload image if a new one was selected (check if it's a local file, not a URL)
                 if (localImage && localImage !== formData.imageUrl && (localImage.startsWith('file://') || localImage.startsWith('data:image') || localImage.startsWith('content://'))) {
-                    const imageUrl = await uploadImage(localImage, editingProduct.id);
-                    productData.image_url = imageUrl;
+                    console.log('New image detected, uploading...');
+                    try {
+                        const imageUrl = await uploadImage(localImage, editingProduct.id);
+                        console.log('Image uploaded successfully, URL:', imageUrl);
+                        productData.image_url = imageUrl;
+                    } catch (uploadError) {
+                        console.error('Error uploading image:', uploadError);
+                        setAlert({
+                            visible: true,
+                            type: 'error',
+                            title: 'Upload Error',
+                            message: `Failed to upload image: ${uploadError.message || 'Unknown error'}. Product will be updated without the new image.`,
+                            onConfirm: () => {
+                                setAlert({ ...alert, visible: false });
+                            }
+                        });
+                        // Continue with old image URL if upload fails
+                        productData.image_url = formData.imageUrl;
+                    }
                 } else {
+                    // Keep existing image URL
                     productData.image_url = formData.imageUrl;
                 }
 
                 // Update existing product
-                const { error } = await supabase
+                console.log('Updating product with data:', { ...productData, image_url: productData.image_url ? 'URL set' : 'No URL' });
+                const { data: updatedProduct, error } = await supabase
                     .from('products')
                     .update(productData)
                     .eq('id', editingProduct.id)
-                    .eq('farmer_id', user.id);
+                    .eq('farmer_id', user.id)
+                    .select()
+                    .single();
 
-                if (error) throw error;
+                if (error) {
+                    console.error('Error updating product:', error);
+                    throw error;
+                }
+
+                console.log('Product updated successfully:', updatedProduct);
 
                 setAlert({
                     visible: true,
@@ -359,6 +422,7 @@ const FarmerProductsScreen = () => {
                     message: 'Product updated successfully!',
                     onConfirm: () => {
                         setShowAddModal(false);
+                        setLocalImage(null);
                         loadProducts();
                     },
                 });
@@ -375,14 +439,35 @@ const FarmerProductsScreen = () => {
                 // If image was uploaded, update the product with the image URL
                 // Only upload if it's a local file (not a URL)
                 if (localImage && (localImage.startsWith('file://') || localImage.startsWith('data:image') || localImage.startsWith('content://'))) {
-                    const uploadedImageUrl = await uploadImage(localImage, newProduct.id);
-                    const { error: updateError } = await supabase
-                        .from('products')
-                        .update({ image_url: uploadedImageUrl })
-                        .eq('id', newProduct.id);
+                    console.log('Uploading image for new product...');
+                    try {
+                        const uploadedImageUrl = await uploadImage(localImage, newProduct.id);
+                        console.log('Image uploaded successfully, URL:', uploadedImageUrl);
+                        
+                        const { data: updatedProduct, error: updateError } = await supabase
+                            .from('products')
+                            .update({ image_url: uploadedImageUrl })
+                            .eq('id', newProduct.id)
+                            .select()
+                            .single();
 
-                    if (updateError) {
-                        console.error('Error updating product image:', updateError);
+                        if (updateError) {
+                            console.error('Error updating product image:', updateError);
+                            throw new Error(`Failed to update product with image: ${updateError.message}`);
+                        }
+                        console.log('Product image updated successfully:', updatedProduct);
+                    } catch (uploadError) {
+                        console.error('Error uploading/updating image:', uploadError);
+                        // Show error but don't fail the whole operation
+                        setAlert({
+                            visible: true,
+                            type: 'warning',
+                            title: 'Image Upload Warning',
+                            message: `Product was created successfully, but image upload failed: ${uploadError.message || 'Unknown error'}. You can edit the product to upload the image again.`,
+                            onConfirm: () => {
+                                setAlert({ ...alert, visible: false });
+                            }
+                        });
                     }
                 }
 
@@ -412,10 +497,11 @@ const FarmerProductsScreen = () => {
 
     const handleDeleteProduct = async (productId) => {
         try {
-            const { data: { user } } = await supabase.auth.getUser();
+            // Use helper function that handles token refresh automatically
+            const { user, error: authError } = await getUserWithRefresh();
             
-            if (!user) {
-                throw new Error('User not authenticated');
+            if (authError || !user) {
+                throw new Error(authError?.message || 'User not authenticated');
             }
 
             const { error } = await supabase
