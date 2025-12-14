@@ -4,8 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../config/supabase';
-import SweetAlert from '../../components/SweetAlert';
 import { getUserWithRefresh } from '../../utils/authHelpers';
+import SweetAlert from '../../components/SweetAlert';
 
 const DonateCropsScreen = () => {
     const router = useRouter();
@@ -337,13 +337,65 @@ const DonateCropsScreen = () => {
         }
     };
 
-    const handleDonateToRequest = (request) => {
-        setAlert({
-            visible: true,
-            type: 'success',
-            title: 'Donation Confirmed!',
-            message: `You have committed to donate ${request.quantity} ${request.unit} of ${request.productName} to ${request.organizationName}. Please contact them at ${request.contactNumber} to arrange pickup.`,
-        });
+    const handleDonateToRequest = async (request) => {
+        try {
+            setLoading(true);
+            const { user, error: authError } = await getUserWithRefresh();
+            
+            if (authError || !user) {
+                setAlert({
+                    visible: true,
+                    type: 'error',
+                    title: 'Authentication Error',
+                    message: authError?.message || 'User not authenticated. Please log in again.',
+                });
+                setLoading(false);
+                return;
+            }
+
+            // Create a donation record in the database
+            const donationData = {
+                farmer_id: user.id,
+                product_name: request.productName,
+                quantity: parseFloat(request.quantity),
+                unit: request.unit,
+                description: `Donation to ${request.organizationName}: ${request.description || 'No description provided'}`,
+                contact_number: request.contactNumber,
+                pickup_location: request.location || null,
+                status: 'available'
+            };
+
+            const { data: insertedData, error } = await supabase
+                .from('crop_donations')
+                .insert(donationData)
+                .select();
+
+            if (error) {
+                console.error('Error creating donation:', error);
+                throw error;
+            }
+
+            // Refresh the donations count and list immediately
+            await loadTotalDonations();
+            await loadDonations();
+
+            setAlert({
+                visible: true,
+                type: 'success',
+                title: 'Donation Confirmed!',
+                message: `You have committed to donate ${request.quantity} ${request.unit} of ${request.productName} to ${request.organizationName}. Please contact them at ${request.contactNumber} to arrange pickup.`,
+            });
+        } catch (error) {
+            console.error('Error donating to request:', error);
+            setAlert({
+                visible: true,
+                type: 'error',
+                title: 'Error',
+                message: error.message || 'Failed to create donation. Please try again.',
+            });
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleUpdateDonationStatus = async (donationId, newStatus) => {
