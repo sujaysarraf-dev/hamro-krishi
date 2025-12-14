@@ -428,8 +428,25 @@ const FarmerWeatherScreen = ({ onNavigateBack }) => {
 
                     {/* AI-Powered Advisory Section */}
                     <View style={dynamicStyles.section}>
-                        <View style={dynamicStyles.sectionHeader}>
-                            <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>🤖 AI-Powered Advisory</Text>
+                        <Text style={[dynamicStyles.sectionTitle, { color: colors.text }]}>🤖 AI-Powered Advisory</Text>
+                        
+                        {/* Upload Photo and Get AI Advice Buttons */}
+                        <View style={dynamicStyles.aiButtonsRow}>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    Alert.alert(
+                                        'Upload Photo',
+                                        'Photo upload feature coming soon! You will be able to upload crop photos for AI analysis.',
+                                        [{ text: 'OK' }]
+                                    );
+                                }}
+                                style={[
+                                    dynamicStyles.uploadPhotoButton,
+                                    { backgroundColor: colors.surface, borderColor: colors.primary }
+                                ]}
+                            >
+                                <Text style={[dynamicStyles.uploadPhotoButtonText, { color: colors.primary }]}>📷 Upload Photo</Text>
+                            </TouchableOpacity>
                             <TouchableOpacity
                                 onPress={fetchAIAdvisory}
                                 disabled={loadingAI || !weatherData}
@@ -676,6 +693,26 @@ const getStyles = (colors, isDark) => StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: 16,
+    },
+    aiButtonsRow: {
+        flexDirection: 'row',
+        gap: 12,
+        marginBottom: 16,
+        flexWrap: 'wrap',
+    },
+    uploadPhotoButton: {
+        flex: 1,
+        minWidth: 140,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderRadius: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1.5,
+    },
+    uploadPhotoButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
     },
     aiButton: {
         paddingHorizontal: 16,

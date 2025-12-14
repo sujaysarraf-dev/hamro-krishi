@@ -10,8 +10,10 @@ import {
     ActivityIndicator,
     Platform,
     Animated,
-    Dimensions
+    Dimensions,
+    Alert
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../context/ThemeContext';
 import { getAIChatResponse } from '../services/geminiService';
 import * as Animatable from 'react-native-animatable';
@@ -144,6 +146,38 @@ const FarmingChatbot = ({ visible, onClose }) => {
     const handleVoiceInput = () => {
         // Placeholder for voice input - would need expo-speech or similar
         alert('Voice input feature coming soon! For now, please type your question.');
+    };
+
+    const handleUploadPhoto = async () => {
+        try {
+            // Request permission to access media library
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            
+            if (status !== 'granted') {
+                Alert.alert(
+                    'Permission Required',
+                    'Sorry, we need camera roll permissions to select photos!',
+                    [{ text: 'OK' }]
+                );
+                return;
+            }
+
+            // Open image picker (dummy - just opens, doesn't upload)
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [4, 3],
+                quality: 0.8,
+            });
+
+            // Just log the result - don't actually upload or do anything
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                console.log('Photo selected (dummy feature):', result.assets[0].uri);
+                // Photo selected but not uploaded - just a dummy feature
+            }
+        } catch (error) {
+            console.error('Error opening image picker:', error);
+        }
     };
 
     const formatTime = (date) => {
@@ -370,6 +404,14 @@ const FarmingChatbot = ({ visible, onClose }) => {
                                 </TouchableOpacity>
                             )}
                             <TouchableOpacity
+                                onPress={handleUploadPhoto}
+                                style={[dynamicStyles.uploadPhotoButton, { backgroundColor: colors.primary + '20' }]}
+                            >
+                                <Text style={[dynamicStyles.uploadPhotoButtonText, { color: colors.primary }]}>
+                                    📷
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
                                 onPress={handleSend}
                                 disabled={!inputText.trim() || isLoading}
                                 style={[
@@ -537,6 +579,17 @@ const getStyles = (colors, isDark) => StyleSheet.create({
     },
     voiceButtonText: {
         fontSize: 18,
+    },
+    uploadPhotoButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginLeft: 4,
+    },
+    uploadPhotoButtonText: {
+        fontSize: 20,
     },
     sendButton: {
         paddingHorizontal: 20,
